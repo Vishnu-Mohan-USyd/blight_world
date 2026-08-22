@@ -1,0 +1,2 @@
+-e git+https://github.com/trieschlab/MIMo.git@040b0ae4914cbfb26afdf830aa81775b90922f3f#egg=MIMo
+-e .[test]

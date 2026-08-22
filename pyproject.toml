@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "blight-world"
+version = "0.1.0"
+description = "A minimal binocular MIMo v2 room environment."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "MIMo==2.0.0",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8,<9",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+blight_world = ["assets/*.template"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
