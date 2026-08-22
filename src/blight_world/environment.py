@@ -11,8 +11,10 @@ from typing import Any
 import mimoEnv
 import mujoco
 import numpy as np
+from gymnasium import spaces, utils
 from gymnasium.envs.mujoco import MujocoEnv
 from mimoEnv.envs.mimo_env import EMOTES, MIMoEnv
+from mimo_audition import AuditionConfig, MIMoAudition
 from numpy.typing import NDArray
 
 
@@ -43,11 +45,21 @@ class BlightWorldEnv(MIMoEnv):
     Installed MIMo assets are referenced read-only and are never rewritten.
     """
 
-    def __init__(self, width: int = 96, height: int = 96) -> None:
+    def __init__(
+        self,
+        width: int = 96,
+        height: int = 96,
+        audition: AuditionConfig | None = None,
+    ) -> None:
         if isinstance(width, bool) or not isinstance(width, int) or width <= 0:
             raise ValueError("width must be a positive integer")
         if isinstance(height, bool) or not isinstance(height, int) or height <= 0:
             raise ValueError("height must be a positive integer")
+        if audition is not None and not isinstance(audition, AuditionConfig):
+            raise TypeError("audition must be an AuditionConfig or None")
+
+        self._audition_config = audition
+        self.audition: MIMoAudition | None = None
 
         upstream_assets = Path(mimoEnv.__file__).resolve().parent / "assets"
         meta_xml = upstream_assets / "mimo" / "MIMo_metav2.xml"
@@ -109,6 +121,7 @@ class BlightWorldEnv(MIMoEnv):
             self._scene_directory.cleanup()
             self._scene_directory = None
             raise
+        utils.EzPickle.__init__(self, width=width, height=height, audition=audition)
 
     @property
     def scene_path(self) -> Path:
@@ -135,6 +148,56 @@ class BlightWorldEnv(MIMoEnv):
         self.actuation_model = self.actuation_model(self, self.mimo_actuators)
         return model, data
 
+    def _env_setup(self) -> None:
+        """Initialize upstream senses, then the optional auditory sensor."""
+
+        super()._env_setup()
+        if self._audition_config is not None:
+            self.audition = MIMoAudition(self.model, self.data, self._audition_config)
+
+    def _set_observation_space(self) -> None:
+        """Extend MIMo's hard-coded modality space with binaural pressure."""
+
+        super()._set_observation_space()
+        if self._audition_config is not None:
+            modality_spaces = dict(self.observation_space.spaces)
+            modality_spaces["audition"] = spaces.Box(
+                -np.inf,
+                np.inf,
+                shape=self._audition_config.spec.observation_shape,
+                dtype=np.float32,
+            )
+            self.observation_space = spaces.Dict(modality_spaces)
+
+    def _get_obs(self) -> dict[str, NDArray[Any]]:
+        """Return upstream observations plus an idempotent audio cache read."""
+
+        observation = super()._get_obs()
+        if self.audition is not None:
+            observation["audition"] = self.audition.observation
+        return observation
+
+    def _single_mujoco_step(self) -> None:
+        """Capture pre-step contact kinematics, then advance MuJoCo once."""
+
+        if self.audition is not None:
+            self.audition.before_substep()
+        super()._single_mujoco_step()
+
+    def _substep_callback(self) -> None:
+        """Render one acoustic block after every 5 ms physics substep."""
+
+        super()._substep_callback()
+        if self.audition is not None:
+            self.audition.capture_substep()
+
+    def _step_callback(self) -> None:
+        """Publish the two rendered substeps before observations are read."""
+
+        super()._step_callback()
+        if self.audition is not None:
+            self.audition.finish_step()
+
     def render(self) -> NDArray[Any] | None:
         """Render from the camera selected through MIMo's legacy interface."""
 
@@ -156,6 +219,8 @@ class BlightWorldEnv(MIMoEnv):
 
         self.set_state(self.init_qpos, self.init_qvel)
         mujoco.mj_forward(self.model, self.data)
+        if self.audition is not None:
+            self.audition.reset(self.np_random_seed)
         return self._get_obs()
 
     def sample_goal(self) -> NDArray[np.float64]:

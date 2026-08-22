@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "blight-world"
 version = "0.1.0"
-description = "A minimal binocular MIMo v2 room environment."
+description = "A minimal MIMo v2 room with optional binaural audition."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -22,6 +22,14 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 blight_world = ["assets/*.template"]
+mimo_audition = [
+    "assets/audio/*.json",
+    "assets/audio/*.md",
+    "assets/audio/24k/*.wav",
+    "assets/audio/48k/*.wav",
+    "assets/hrtf/*.md",
+    "assets/hrtf/*.npz",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

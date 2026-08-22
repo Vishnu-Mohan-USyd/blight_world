@@ -1,0 +1,663 @@
+{
+  "clips": {
+    "chime": {
+      "files": {
+        "24000": {
+          "path": "24k/chime.wav",
+          "sha256": "ca111a350e9e3a9accf3a080fc06b069e70ce3a70c7169be83c1f1a30515bf6b"
+        },
+        "48000": {
+          "path": "48k/chime.wav",
+          "sha256": "3cea10604981905802ad04ab540879ad55fcdee953b3c072af2af5741fcbb5fd"
+        }
+      },
+      "kind": "effect",
+      "materials": null,
+      "reference_peak_pressure_pa_at_1m": 0.2
+    },
+    "click": {
+      "files": {
+        "24000": {
+          "path": "24k/click.wav",
+          "sha256": "91651a484eac2987fad7aa4b80521b7e09d6db9d298a9d840aecd310a4774d60"
+        },
+        "48000": {
+          "path": "48k/click.wav",
+          "sha256": "0acc47260994b1ca60581aac544a1b447a566f82ee7644062997a6717013a794"
+        }
+      },
+      "kind": "effect",
+      "materials": null,
+      "reference_peak_pressure_pa_at_1m": 0.2
+    },
+    "impact_hard_plastic_0": {
+      "files": {
+        "24000": {
+          "path": "24k/impact_hard_plastic_0.wav",
+          "sha256": "b9bb80b49f82d027b028fa43cc5e2a0ed24dce217e4cbd97945673946a670aac"
+        },
+        "48000": {
+          "path": "48k/impact_hard_plastic_0.wav",
+          "sha256": "0b976a907f169e437e7f17de88acba074827fe7bc9c332ba51e4c67ec1694620"
+        }
+      },
+      "kind": "impact",
+      "materials": [
+        "hard",
+        "plastic"
+      ],
+      "reference_peak_pressure_pa_at_1m": 0.2
+    },
+    "impact_hard_plastic_1": {
+      "files": {
+        "24000": {
+          "path": "24k/impact_hard_plastic_1.wav",
+          "sha256": "23ce59fbbab0b57f7dc795891d4c8540a44943a165e47bc2d328d4e095ed9f9a"
+        },
+        "48000": {
+          "path": "48k/impact_hard_plastic_1.wav",
+          "sha256": "607c8a296dfb068371f0c5b17462b39e5bb752bd17a6190e1cf310ae234ba857"
+        }
+      },
+      "kind": "impact",
+      "materials": [
+        "hard",
+        "plastic"
+      ],
+      "reference_peak_pressure_pa_at_1m": 0.2
+    },
+    "impact_hard_plastic_2": {
+      "files": {
+        "24000": {
+          "path": "24k/impact_hard_plastic_2.wav",
+          "sha256": "5dbbbec1e9c40d6d3f10e7ae2125054bcb62fa23f3aaa01447ea59bebaf36d92"
+        },
+        "48000": {
+          "path": "48k/impact_hard_plastic_2.wav",
+          "sha256": "145775874d58b78ffbdfcce9e6910670a86a4cfeaefc31ccbec71842265ebcd4"
+        }
+      },
+      "kind": "impact",
+      "materials": [
+        "hard",
+        "plastic"
+      ],
+      "reference_peak_pressure_pa_at_1m": 0.2
+    },
+    "impact_hard_rubber_0": {
+      "files": {
+        "24000": {
+          "path": "24k/impact_hard_rubber_0.wav",
+          "sha256": "f8fc507f1f8ca0e027fbc55aa66c7ce2687823fd8651830d1983d7504bf7ae29"
+        },
+        "48000": {
+          "path": "48k/impact_hard_rubber_0.wav",
+          "sha256": "1265d51aac64f77b9fb8dbb0b44d3d7b5dc39ad9d3ad695fb9e13f04c8deff11"
+        }
+      },
+      "kind": "impact",
+      "materials": [
+        "hard",
+        "rubber"
+      ],
+      "reference_peak_pressure_pa_at_1m": 0.2
+    },
+    "impact_hard_rubber_1": {
+      "files": {
+        "24000": {
+          "path": "24k/impact_hard_rubber_1.wav",
+          "sha256": "93f4eaa49ed8b5e700f25c691eacdc33bebe6ae3be3c39107748a2fb6f88b43e"
+        },
+        "48000": {
+          "path": "48k/impact_hard_rubber_1.wav",
+          "sha256": "9ecf67209c4d52ebd5950696918890a16e4e690ba5101ac14633198b2e9f6947"
+        }
+      },
+      "kind": "impact",
+      "materials": [
+        "hard",
+        "rubber"
+      ],
+      "reference_peak_pressure_pa_at_1m": 0.2
+    },
+    "impact_hard_rubber_2": {
+      "files": {
+        "24000": {
+          "path": "24k/impact_hard_rubber_2.wav",
+          "sha256": "2fcc293e35e2e9ad191f7d87335d741d1b46820d245aa77e7197accec25a8c98"
+        },
+        "48000": {
+          "path": "48k/impact_hard_rubber_2.wav",
+          "sha256": "0c7ab0d1efc82f506a1b063f437321825b4171890076a8ee0b3afaf03fa9e836"
+        }
+      },
+      "kind": "impact",
+      "materials": [
+        "hard",
+        "rubber"
+      ],
+      "reference_peak_pressure_pa_at_1m": 0.2
+    },
+    "impact_hard_soft_0": {
+      "files": {
+        "24000": {
+          "path": "24k/impact_hard_soft_0.wav",
+          "sha256": "90042f46322f956e132d9f703098dcf766deb93a210a489a441a8ac800f1ce0a"
+        },
+        "48000": {
+          "path": "48k/impact_hard_soft_0.wav",
+          "sha256": "4a2bca23160603b1df6c2d57e6a358aa101e4a40f1c712f02a33574ec53845b2"
+        }
+      },
+      "kind": "impact",
+      "materials": [
+        "hard",
+        "soft"
+      ],
+      "reference_peak_pressure_pa_at_1m": 0.2
+    },
+    "impact_hard_soft_1": {
+      "files": {
+        "24000": {
+          "path": "24k/impact_hard_soft_1.wav",
+          "sha256": "9938700dac1d836ce06c77b799865fc318bc4d81f0f135a7e2940e5f99735dae"
+        },
+        "48000": {
+          "path": "48k/impact_hard_soft_1.wav",
+          "sha256": "d4ea65e9015bcab195dc1b1d2d1ce5c2fb8905ddd1e1194eb6daa8816b4dec22"
+        }
+      },
+      "kind": "impact",
+      "materials": [
+        "hard",
+        "soft"
+      ],
+      "reference_peak_pressure_pa_at_1m": 0.2
+    },
+    "impact_hard_soft_2": {
+      "files": {
+        "24000": {
+          "path": "24k/impact_hard_soft_2.wav",
+          "sha256": "8921f58022bbc98413279e194b67b578c85e9bf9d227cbb832e357cc13946791"
+        },
+        "48000": {
+          "path": "48k/impact_hard_soft_2.wav",
+          "sha256": "51f09466abe975bccd9c6a6f837555aebee997f1092a574665f018db046f72cd"
+        }
+      },
+      "kind": "impact",
+      "materials": [
+        "hard",
+        "soft"
+      ],
+      "reference_peak_pressure_pa_at_1m": 0.2
+    },
+    "impact_hard_wood_0": {
+      "files": {
+        "24000": {
+          "path": "24k/impact_hard_wood_0.wav",
+          "sha256": "a9ef74c1a77c9eeec595f852a53658ea0c0907ac905f2995b1a82fc21277ce79"
+        },
+        "48000": {
+          "path": "48k/impact_hard_wood_0.wav",
+          "sha256": "9b30c5bc70250386c33b6a96a4876142e8ca41a49a1d42bab3696dcbb90d33aa"
+        }
+      },
+      "kind": "impact",
+      "materials": [
+        "hard",
+        "wood"
+      ],
+      "reference_peak_pressure_pa_at_1m": 0.2
+    },
+    "impact_hard_wood_1": {
+      "files": {
+        "24000": {
+          "path": "24k/impact_hard_wood_1.wav",
+          "sha256": "0e8f69aa58651f580a0c84474d7517a73f457f7e8f1c0c114aae9ca3aa2c1782"
+        },
+        "48000": {
+          "path": "48k/impact_hard_wood_1.wav",
+          "sha256": "9ca1cf5cffef463f7348fce7cf83b1609da86de56cbb70fb962318bf99b6316d"
+        }
+      },
+      "kind": "impact",
+      "materials": [
+        "hard",
+        "wood"
+      ],
+      "reference_peak_pressure_pa_at_1m": 0.2
+    },
+    "impact_hard_wood_2": {
+      "files": {
+        "24000": {
+          "path": "24k/impact_hard_wood_2.wav",
+          "sha256": "826f6c11e7cbdb640652f62f0849d5dd0bf1f16e317ac39a9a2d759d4499ad7e"
+        },
+        "48000": {
+          "path": "48k/impact_hard_wood_2.wav",
+          "sha256": "b0370e2a1b8757b608aa65fadc5923bc39ca0a2f0f752a2c885489cd1ac6673a"
+        }
+      },
+      "kind": "impact",
+      "materials": [
+        "hard",
+        "wood"
+      ],
+      "reference_peak_pressure_pa_at_1m": 0.2
+    },
+    "impact_plastic_soft_0": {
+      "files": {
+        "24000": {
+          "path": "24k/impact_plastic_soft_0.wav",
+          "sha256": "4f4a8f429a0f3d0cc4ca50651ecbd73aa5f585e3baf8c729fd73e24b09c01948"
+        },
+        "48000": {
+          "path": "48k/impact_plastic_soft_0.wav",
+          "sha256": "ca38416aabc2729df964dc6bda03709100d3dee659f3d303056ac4439b35a2c1"
+        }
+      },
+      "kind": "impact",
+      "materials": [
+        "plastic",
+        "soft"
+      ],
+      "reference_peak_pressure_pa_at_1m": 0.2
+    },
+    "impact_plastic_soft_1": {
+      "files": {
+        "24000": {
+          "path": "24k/impact_plastic_soft_1.wav",
+          "sha256": "4190ff897c7bc9a78c92410da8375155c0b45108433655af0dbc9ef9d26a373c"
+        },
+        "48000": {
+          "path": "48k/impact_plastic_soft_1.wav",
+          "sha256": "bf43bea539f616360cb4e712afd4a914e9d50ff763b2f2a648d62216374342d0"
+        }
+      },
+      "kind": "impact",
+      "materials": [
+        "plastic",
+        "soft"
+      ],
+      "reference_peak_pressure_pa_at_1m": 0.2
+    },
+    "impact_plastic_soft_2": {
+      "files": {
+        "24000": {
+          "path": "24k/impact_plastic_soft_2.wav",
+          "sha256": "33e14637997eb9001002b9ddb111bbb6c85a7d63710f71f6937b55a84c920335"
+        },
+        "48000": {
+          "path": "48k/impact_plastic_soft_2.wav",
+          "sha256": "9afca0639c582925c1bd71073e8bfac8814a8f4fd01e5494ca7b7d040f1e3343"
+        }
+      },
+      "kind": "impact",
+      "materials": [
+        "plastic",
+        "soft"
+      ],
+      "reference_peak_pressure_pa_at_1m": 0.2
+    },
+    "impact_rubber_plastic_0": {
+      "files": {
+        "24000": {
+          "path": "24k/impact_rubber_plastic_0.wav",
+          "sha256": "b3b0f24ca2405e4fece14a09d0963bba37e1005422980420df999b179e521332"
+        },
+        "48000": {
+          "path": "48k/impact_rubber_plastic_0.wav",
+          "sha256": "396686e8bea42e752049966e3cd0385f388a1a610c3b676201ff609d2ff66ae4"
+        }
+      },
+      "kind": "impact",
+      "materials": [
+        "rubber",
+        "plastic"
+      ],
+      "reference_peak_pressure_pa_at_1m": 0.2
+    },
+    "impact_rubber_plastic_1": {
+      "files": {
+        "24000": {
+          "path": "24k/impact_rubber_plastic_1.wav",
+          "sha256": "a3c1d83ede551ca178a0f9e35d8dae1eb6687e1420ec82142b3842da733e6246"
+        },
+        "48000": {
+          "path": "48k/impact_rubber_plastic_1.wav",
+          "sha256": "427d4ad47ef7230ca673931669bcbf4a236a730300ee3f75ed51fc9af99bba11"
+        }
+      },
+      "kind": "impact",
+      "materials": [
+        "rubber",
+        "plastic"
+      ],
+      "reference_peak_pressure_pa_at_1m": 0.2
+    },
+    "impact_rubber_plastic_2": {
+      "files": {
+        "24000": {
+          "path": "24k/impact_rubber_plastic_2.wav",
+          "sha256": "cebbbc0296be0a92847830672058bf5bc00d0f349034e6ce0e64094cfee1a05b"
+        },
+        "48000": {
+          "path": "48k/impact_rubber_plastic_2.wav",
+          "sha256": "efafb5f5b23fc420ec6d1778572f56991fa4169f74ce99dbe0fb5b0d2c6b6b4b"
+        }
+      },
+      "kind": "impact",
+      "materials": [
+        "rubber",
+        "plastic"
+      ],
+      "reference_peak_pressure_pa_at_1m": 0.2
+    },
+    "impact_rubber_soft_0": {
+      "files": {
+        "24000": {
+          "path": "24k/impact_rubber_soft_0.wav",
+          "sha256": "165d4eb383006d547891ce69a799ead54c6157ba7278bad0c9c943f40195d1e8"
+        },
+        "48000": {
+          "path": "48k/impact_rubber_soft_0.wav",
+          "sha256": "99566e62e29681f28270ecad99c1e4103254e917e97ccf86b8301dfa8ab05a9b"
+        }
+      },
+      "kind": "impact",
+      "materials": [
+        "rubber",
+        "soft"
+      ],
+      "reference_peak_pressure_pa_at_1m": 0.2
+    },
+    "impact_rubber_soft_1": {
+      "files": {
+        "24000": {
+          "path": "24k/impact_rubber_soft_1.wav",
+          "sha256": "32494066bbc421ef37eeab6ae1202af7a36a78bad7bd9d27c4c7db1a0708bfc9"
+        },
+        "48000": {
+          "path": "48k/impact_rubber_soft_1.wav",
+          "sha256": "cca79f3824b42d0001818c09770cb2ab4919a10769630ef0707c6ab4b34af63a"
+        }
+      },
+      "kind": "impact",
+      "materials": [
+        "rubber",
+        "soft"
+      ],
+      "reference_peak_pressure_pa_at_1m": 0.2
+    },
+    "impact_rubber_soft_2": {
+      "files": {
+        "24000": {
+          "path": "24k/impact_rubber_soft_2.wav",
+          "sha256": "a8e9645987aeaac130e3b258f8792ab7879264079cade131ed8ae51b8da27c22"
+        },
+        "48000": {
+          "path": "48k/impact_rubber_soft_2.wav",
+          "sha256": "29ddaf7d9bf8c82e56c7847c59789a9d52d08e02ef981af3e43e77914133d01a"
+        }
+      },
+      "kind": "impact",
+      "materials": [
+        "rubber",
+        "soft"
+      ],
+      "reference_peak_pressure_pa_at_1m": 0.2
+    },
+    "impact_wood_plastic_0": {
+      "files": {
+        "24000": {
+          "path": "24k/impact_wood_plastic_0.wav",
+          "sha256": "78fcbace19f495c238587b26ccf82cf5b2910747bf78215d98ced67cb966eaec"
+        },
+        "48000": {
+          "path": "48k/impact_wood_plastic_0.wav",
+          "sha256": "d6344cd1dedc3859f1d2a9300b51d6ded3c698c3da599a7c2525b33ebc140904"
+        }
+      },
+      "kind": "impact",
+      "materials": [
+        "wood",
+        "plastic"
+      ],
+      "reference_peak_pressure_pa_at_1m": 0.2
+    },
+    "impact_wood_plastic_1": {
+      "files": {
+        "24000": {
+          "path": "24k/impact_wood_plastic_1.wav",
+          "sha256": "216bc07e46ab3598265c2e2713e951c616c7174d0e18d5e1cb27df7b74a0154f"
+        },
+        "48000": {
+          "path": "48k/impact_wood_plastic_1.wav",
+          "sha256": "1837db1156e75fa963dfd47e7bd19493059e8eb8a6d9dc0eb8e8b78560467ba4"
+        }
+      },
+      "kind": "impact",
+      "materials": [
+        "wood",
+        "plastic"
+      ],
+      "reference_peak_pressure_pa_at_1m": 0.2
+    },
+    "impact_wood_plastic_2": {
+      "files": {
+        "24000": {
+          "path": "24k/impact_wood_plastic_2.wav",
+          "sha256": "de62ef5ca1dd62de0b864c97ac384afd51560723eab1017d8b319c5f6096f770"
+        },
+        "48000": {
+          "path": "48k/impact_wood_plastic_2.wav",
+          "sha256": "8a3e2eb4d3ab402fd9adf774c5050c4c697aab81b619bff417bfec2e78db3a80"
+        }
+      },
+      "kind": "impact",
+      "materials": [
+        "wood",
+        "plastic"
+      ],
+      "reference_peak_pressure_pa_at_1m": 0.2
+    },
+    "impact_wood_rubber_0": {
+      "files": {
+        "24000": {
+          "path": "24k/impact_wood_rubber_0.wav",
+          "sha256": "ab97052a5c89af1fe33da769cb4afeaf17ef40e803dd7429eeb63bf16df4522a"
+        },
+        "48000": {
+          "path": "48k/impact_wood_rubber_0.wav",
+          "sha256": "ea74f5b2aaef6c9cafe28762e8b4c8df67f5be65224db9d27973136806f7544c"
+        }
+      },
+      "kind": "impact",
+      "materials": [
+        "wood",
+        "rubber"
+      ],
+      "reference_peak_pressure_pa_at_1m": 0.2
+    },
+    "impact_wood_rubber_1": {
+      "files": {
+        "24000": {
+          "path": "24k/impact_wood_rubber_1.wav",
+          "sha256": "fd37d690e0da4cf194db1715cd8c914a3ecb12b0e3b13d94e9d4db25ce3cc169"
+        },
+        "48000": {
+          "path": "48k/impact_wood_rubber_1.wav",
+          "sha256": "ed7a9c979cf201a30d43b96bbec4f4c9c4435bc87daf9d3b9bf19061886ecc77"
+        }
+      },
+      "kind": "impact",
+      "materials": [
+        "wood",
+        "rubber"
+      ],
+      "reference_peak_pressure_pa_at_1m": 0.2
+    },
+    "impact_wood_rubber_2": {
+      "files": {
+        "24000": {
+          "path": "24k/impact_wood_rubber_2.wav",
+          "sha256": "84224f03d2ce9261e6fa7698b614d9855a8d1e75a276a1e33dc6c9f4b5299a49"
+        },
+        "48000": {
+          "path": "48k/impact_wood_rubber_2.wav",
+          "sha256": "716416748556d2af00f6769f93fb60eb50e5a583cf511f3b4c49bb57ac9b145e"
+        }
+      },
+      "kind": "impact",
+      "materials": [
+        "wood",
+        "rubber"
+      ],
+      "reference_peak_pressure_pa_at_1m": 0.2
+    },
+    "impact_wood_soft_0": {
+      "files": {
+        "24000": {
+          "path": "24k/impact_wood_soft_0.wav",
+          "sha256": "ba245f4c0a9cb31e8885f928b9447ffc5f0507d4e6e1a670f146a2474d5c3037"
+        },
+        "48000": {
+          "path": "48k/impact_wood_soft_0.wav",
+          "sha256": "49b921abda71236d99753dc03c106d1f9012ad3c2cee290e9cc2e7b5061108dd"
+        }
+      },
+      "kind": "impact",
+      "materials": [
+        "wood",
+        "soft"
+      ],
+      "reference_peak_pressure_pa_at_1m": 0.2
+    },
+    "impact_wood_soft_1": {
+      "files": {
+        "24000": {
+          "path": "24k/impact_wood_soft_1.wav",
+          "sha256": "edfee9d84ca1dc92152d53436b59784bad6906b059e45a992de3611f003b2350"
+        },
+        "48000": {
+          "path": "48k/impact_wood_soft_1.wav",
+          "sha256": "d222bd00bb1ac1bc5d62c2f03c4ed653492342c59e4cb1794cd8257e0bf71009"
+        }
+      },
+      "kind": "impact",
+      "materials": [
+        "wood",
+        "soft"
+      ],
+      "reference_peak_pressure_pa_at_1m": 0.2
+    },
+    "impact_wood_soft_2": {
+      "files": {
+        "24000": {
+          "path": "24k/impact_wood_soft_2.wav",
+          "sha256": "e7be1026119c04c655983f6641c7e254739f21fbb7b0674a7da8ce3ecd12a86b"
+        },
+        "48000": {
+          "path": "48k/impact_wood_soft_2.wav",
+          "sha256": "df15962a7bc211e4e89e9515d0c025ddcfb117382e7d2f61365e3230d215cd5f"
+        }
+      },
+      "kind": "impact",
+      "materials": [
+        "wood",
+        "soft"
+      ],
+      "reference_peak_pressure_pa_at_1m": 0.2
+    },
+    "impact_wood_wood_0": {
+      "files": {
+        "24000": {
+          "path": "24k/impact_wood_wood_0.wav",
+          "sha256": "d7394aa2a89654aecc56d101bf2e7637dfcfbde023d75c0d2e141350937d2cce"
+        },
+        "48000": {
+          "path": "48k/impact_wood_wood_0.wav",
+          "sha256": "7825cd058e57849fdb1968e65bbdc078208c1cc4cf28e24cdeaa4b8a332458a5"
+        }
+      },
+      "kind": "impact",
+      "materials": [
+        "wood",
+        "wood"
+      ],
+      "reference_peak_pressure_pa_at_1m": 0.2
+    },
+    "impact_wood_wood_1": {
+      "files": {
+        "24000": {
+          "path": "24k/impact_wood_wood_1.wav",
+          "sha256": "d65c09b2bd08f1e6544467c02c5e614d892e3ddbfe5948b9d27214ac53440d58"
+        },
+        "48000": {
+          "path": "48k/impact_wood_wood_1.wav",
+          "sha256": "a97548d08302660265dc383a55594473634393be6be788e591894b08ae49bb68"
+        }
+      },
+      "kind": "impact",
+      "materials": [
+        "wood",
+        "wood"
+      ],
+      "reference_peak_pressure_pa_at_1m": 0.2
+    },
+    "impact_wood_wood_2": {
+      "files": {
+        "24000": {
+          "path": "24k/impact_wood_wood_2.wav",
+          "sha256": "54d76aad1eb4cd4cf596e7922e95f7aa1473426e193af88b4dcd1dbd98ec3f53"
+        },
+        "48000": {
+          "path": "48k/impact_wood_wood_2.wav",
+          "sha256": "71bd4aaeed50ed1c9b0ab9299caeed8ce4e42b162a24c85fb5e2d3a84934c56d"
+        }
+      },
+      "kind": "impact",
+      "materials": [
+        "wood",
+        "wood"
+      ],
+      "reference_peak_pressure_pa_at_1m": 0.2
+    },
+    "rattle": {
+      "files": {
+        "24000": {
+          "path": "24k/rattle.wav",
+          "sha256": "975206fba23f187b62260878e7aa4fd7fbd18aed4c958b2c467a596fe2fc68ce"
+        },
+        "48000": {
+          "path": "48k/rattle.wav",
+          "sha256": "34acabe8798f13e51ca38db9edb66df49579fe5d0950934ff22119f9153d1917"
+        }
+      },
+      "kind": "effect",
+      "materials": null,
+      "reference_peak_pressure_pa_at_1m": 0.2
+    },
+    "squeak": {
+      "files": {
+        "24000": {
+          "path": "24k/squeak.wav",
+          "sha256": "c6f07d903f6ee2783632e0d4bb53ffc1848c870cbd135b6d676fccbcca6102e0"
+        },
+        "48000": {
+          "path": "48k/squeak.wav",
+          "sha256": "81ce315120de01e51d990e300f0397e52bc886c90e07549cd049325b66c9eb36"
+        }
+      },
+      "kind": "effect",
+      "materials": null,
+      "reference_peak_pressure_pa_at_1m": 0.2
+    }
+  },
+  "derivation_24k": "127-tap Kaiser beta=8.6 LP at 10.8 kHz, delay-compensated, decimate 2",
+  "description": "Deterministic generated dry impact/effect waveforms",
+  "license": "CC0-1.0 (project-generated)",
+  "master_sample_rate_hz": 48000,
+  "version": 1
+}
