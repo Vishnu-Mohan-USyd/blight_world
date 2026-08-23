@@ -79,16 +79,13 @@ class MIMoAudition:
     def capture_substep(self) -> None:
         """Schedule new impacts and render one 5 ms acoustic interval."""
 
-        available = max(
-            self.config.max_active_voices - self.renderer.active_voice_count,
-            0,
-        )
-        for event in self._impacts.detect()[:available]:
+        for event in self._impacts.detect():
             self.renderer.play_transient(
                 event.clip_id,
                 event.attachment,
                 gain_db=event.gain_db,
                 delay_s=0.010,
+                impact_energy_j=event.energy_j,
             )
         self._pending_substeps.append(self.renderer.render_substep(self.scene))
 

@@ -18,6 +18,8 @@ from blight_world import (
     StaticAttachment,
 )
 from mimo_audition.mujoco_scene import LEFT_EAR_LOCAL_M, RIGHT_EAR_LOCAL_M
+from mimo_audition.renderer import BinauralRenderer
+from mimo_audition.sources import Attachment
 
 
 @pytest.fixture(scope="module")
@@ -274,3 +276,125 @@ def test_virtual_ears_attachments_and_mujoco_occlusion(
         source_behind_block,
         source_body_id=-1,
     )
+
+
+def _peak_reserved_dry_voices(renderer: BinauralRenderer) -> int:
+    """Return peak block occupancy across all retained dry intervals."""
+
+    changes: dict[int, int] = {}
+    for voice in renderer._voices:
+        interval = renderer._voice_dry_block_interval(voice)
+        if interval is None:
+            continue
+        start_block, end_block = interval
+        changes[start_block] = changes.get(start_block, 0) + 1
+        if end_block is not None:
+            changes[end_block] = changes.get(end_block, 0) - 1
+    occupancy = 0
+    peak = 0
+    for block in sorted(changes):
+        occupancy += changes[block]
+        peak = max(peak, occupancy)
+    return peak
+
+
+def _run_live_voice_trace(
+    environment: BlightWorldEnv,
+    *,
+    driven: bool,
+) -> tuple[
+    np.ndarray,
+    tuple[tuple[str, float, float, int | None], ...],
+    int,
+    int,
+    int,
+]:
+    """Run the confirmed 60-step overflow reproducer or passive control."""
+
+    environment.reset(seed=1_401)
+    assert environment.audition is not None
+    renderer = environment.audition.renderer
+    original_play_transient = renderer.play_transient
+    allocations: list[tuple[str, float, float, int | None]] = []
+    peak_occupancy = 0
+
+    def recording_play_transient(
+        clip_id: str,
+        attachment: Attachment,
+        *,
+        gain_db: float = 0.0,
+        delay_s: float = 0.0,
+        impact_energy_j: float = 0.0,
+    ) -> int | None:
+        nonlocal peak_occupancy
+        voice_id = original_play_transient(
+            clip_id,
+            attachment,
+            gain_db=gain_db,
+            delay_s=delay_s,
+            impact_energy_j=impact_energy_j,
+        )
+        allocations.append((clip_id, gain_db, impact_energy_j, voice_id))
+        peak_occupancy = max(peak_occupancy, _peak_reserved_dry_voices(renderer))
+        return voice_id
+
+    renderer.play_transient = recording_play_transient  # type: ignore[method-assign]
+    blocks = []
+    try:
+        for step_index in range(60):
+            if driven:
+                phase = 0.17 * step_index + 0.37 * np.arange(90)
+                action = np.clip(
+                    0.28 * np.sin(phase),
+                    environment.action_space.low,
+                    environment.action_space.high,
+                )
+            else:
+                action = np.zeros(environment.action_space.shape, dtype=np.float32)
+            observation, *_ = environment.step(action)
+            pressure = observation["audition"]
+            assert pressure.shape == (2, 480)
+            assert pressure.dtype == np.float32
+            assert np.all(np.isfinite(pressure))
+            blocks.append(pressure.copy())
+            peak_occupancy = max(
+                peak_occupancy,
+                _peak_reserved_dry_voices(renderer),
+            )
+    finally:
+        del renderer.play_transient
+
+    return (
+        np.concatenate(blocks, axis=1),
+        tuple(allocations),
+        peak_occupancy,
+        len(renderer._voices),
+        renderer.sample_cursor,
+    )
+
+
+def test_seed1401_voice_stress_is_bounded_deterministic_and_passive_safe() -> None:
+    """The exact formerly overflowing interaction never exceeds eight voices."""
+
+    environment = BlightWorldEnv(
+        width=16,
+        height=12,
+        audition=AuditionConfig.quality_48k(),
+    )
+    try:
+        first = _run_live_voice_trace(environment, driven=True)
+        second = _run_live_voice_trace(environment, driven=True)
+        np.testing.assert_array_equal(first[0], second[0])
+        assert first[1] == second[1]
+        assert first[2] == second[2] == 8
+        assert any(allocation[3] is None for allocation in first[1])
+        assert first[4] == second[4] == 28_800
+
+        passive = _run_live_voice_trace(environment, driven=False)
+        assert len(passive[1]) == 7
+        assert all(allocation[3] is not None for allocation in passive[1])
+        assert passive[2] == 7
+        assert passive[3] == 0
+        assert passive[4] == 28_800
+    finally:
+        environment.close()

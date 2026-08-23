@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from math import isfinite
 from typing import Protocol
 
@@ -57,6 +57,7 @@ class _Voice:
     paths: list[_PathState]
     occlusion_smoother: AttackReleaseSmoother
     occlusion_lowpass: OnePoleLowpass
+    impact_priority: float | None
     previous_listener_position_m: FloatArray | None = None
     previous_source_position_m: FloatArray | None = None
     dry_end_sample: int | None = None
@@ -149,7 +150,10 @@ class BinauralRenderer:
             source = self._sources[source_id]
         except KeyError as error:
             raise KeyError(f"unknown source_id: {source_id}") from error
-        return self._schedule_voice(source, delay_s)
+        voice_id = self._schedule_voice(source, delay_s, impact_priority=None)
+        if voice_id is None:
+            raise AssertionError("explicit voice admission returned no identifier")
+        return voice_id
 
     def play_transient(
         self,
@@ -158,8 +162,17 @@ class BinauralRenderer:
         *,
         gain_db: float = 0.0,
         delay_s: float = 0.0,
-    ) -> int:
-        """Schedule an unregistered one-shot, used for physical impacts."""
+        impact_energy_j: float = 0.0,
+    ) -> int | None:
+        """Best-effort schedule an unregistered physical-impact one-shot.
+
+        A stronger pending impact may replace a weaker overlapping pending
+        impact. Equal-energy candidates retain arrival order. Capacity
+        rejection returns ``None`` and never defers an exception to rendering.
+        """
+
+        if not isfinite(impact_energy_j) or impact_energy_j < 0:
+            raise ValueError("impact_energy_j must be finite and non-negative")
 
         source = AudioSourceSpec(
             source_id=f"__impact_{self._next_voice_id}",
@@ -169,19 +182,118 @@ class BinauralRenderer:
             gain_db=gain_db,
         )
         self.clips.get(clip_id)
-        return self._schedule_voice(source, delay_s)
+        return self._schedule_voice(
+            source,
+            delay_s,
+            impact_priority=impact_energy_j,
+        )
 
-    def _schedule_voice(self, source: AudioSourceSpec, delay_s: float) -> int:
-        """Create one scheduled voice after shared limit validation."""
+    def _dry_end_sample(self, voice: _Voice) -> int | None:
+        """Return the exclusive dry-signal end, excluding retained tails."""
 
-        if not isfinite(delay_s) or delay_s < 0:
-            raise ValueError("delay_s must be finite and non-negative")
-        pending = sum(voice.start_sample >= self._sample_cursor for voice in self._voices)
-        if pending >= self.config.max_scheduled_events:
-            raise RuntimeError("scheduled event limit reached")
-        start_sample = self._sample_cursor + round(delay_s * self.config.sample_rate_hz)
-        clip = self.clips.get(source.clip_id)
-        dry_end_sample = None if source.loop else start_sample + clip.samples.size
+        dry_end = voice.dry_end_sample
+        if voice.stop_sample is not None:
+            dry_end = (
+                voice.stop_sample
+                if dry_end is None
+                else min(dry_end, voice.stop_sample)
+            )
+        return dry_end
+
+    def _dry_block_interval(
+        self,
+        start_sample: int,
+        end_sample: int | None,
+    ) -> tuple[int, int | None] | None:
+        """Map a half-open dry sample interval to occupied render blocks."""
+
+        if end_sample is not None and end_sample <= start_sample:
+            return None
+        block_size = self.spec.samples_per_substep
+        start_block = start_sample // block_size
+        end_block = (
+            None
+            if end_sample is None
+            else (end_sample + block_size - 1) // block_size
+        )
+        return start_block, end_block
+
+    def _voice_dry_block_interval(
+        self,
+        voice: _Voice,
+    ) -> tuple[int, int | None] | None:
+        return self._dry_block_interval(voice.start_sample, self._dry_end_sample(voice))
+
+    @staticmethod
+    def _block_intervals_overlap(
+        first: tuple[int, int | None],
+        second: tuple[int, int | None],
+    ) -> bool:
+        first_start, first_end = first
+        second_start, second_end = second
+        return (first_end is None or second_start < first_end) and (
+            second_end is None or first_start < second_end
+        )
+
+    def _capacity_conflicts(
+        self,
+        candidate: tuple[int, int | None],
+        excluded_voice_ids: set[int] | frozenset[int] = frozenset(),
+    ) -> frozenset[int]:
+        """Return voices occupying any already-full candidate render block."""
+
+        candidate_start, candidate_end = candidate
+        intervals: list[tuple[_Voice, int, int | None]] = []
+        change_blocks = {candidate_start}
+        for voice in self._voices:
+            if voice.voice_id in excluded_voice_ids:
+                continue
+            interval = self._voice_dry_block_interval(voice)
+            if interval is None or not self._block_intervals_overlap(candidate, interval):
+                continue
+            start_block, end_block = interval
+            intervals.append((voice, start_block, end_block))
+            change_blocks.add(max(candidate_start, start_block))
+            if end_block is not None and (
+                candidate_end is None or end_block < candidate_end
+            ):
+                change_blocks.add(end_block)
+
+        conflicts: set[int] = set()
+        for block in sorted(change_blocks):
+            if candidate_end is not None and block >= candidate_end:
+                continue
+            active = {
+                voice.voice_id
+                for voice, start_block, end_block in intervals
+                if start_block <= block and (end_block is None or block < end_block)
+            }
+            if len(active) >= self.config.max_active_voices:
+                conflicts.update(active)
+        return frozenset(conflicts)
+
+    def _pending_voice_count(
+        self,
+        excluded_voice_ids: set[int] | frozenset[int] = frozenset(),
+    ) -> int:
+        """Count scheduled voices that still have a future/current dry interval."""
+
+        return sum(
+            voice.voice_id not in excluded_voice_ids
+            and voice.start_sample >= self._sample_cursor
+            and self._voice_dry_block_interval(voice) is not None
+            for voice in self._voices
+        )
+
+    def _append_voice(
+        self,
+        source: AudioSourceSpec,
+        start_sample: int,
+        dry_end_sample: int | None,
+        impact_priority: float | None,
+    ) -> int:
+        """Allocate renderer state after interval admission succeeds."""
+
         voice = _Voice(
             voice_id=self._next_voice_id,
             source=source,
@@ -197,11 +309,86 @@ class BinauralRenderer:
                 self.config.occlusion_cutoff_hz,
                 self.config.sample_rate_hz,
             ),
+            impact_priority=impact_priority,
             dry_end_sample=dry_end_sample,
         )
         self._voices.append(voice)
         self._next_voice_id += 1
         return voice.voice_id
+
+    def _schedule_voice(
+        self,
+        source: AudioSourceSpec,
+        delay_s: float,
+        *,
+        impact_priority: float | None,
+    ) -> int | None:
+        """Admit a complete dry interval before allocating renderer state."""
+
+        if not isfinite(delay_s) or delay_s < 0:
+            raise ValueError("delay_s must be finite and non-negative")
+        start_sample = self._sample_cursor + round(delay_s * self.config.sample_rate_hz)
+        clip = self.clips.get(source.clip_id)
+        dry_end_sample = None if source.loop else start_sample + clip.samples.size
+        candidate = self._dry_block_interval(start_sample, dry_end_sample)
+        if candidate is None:
+            raise AssertionError("validated non-empty clip has an empty dry interval")
+
+        if impact_priority is None:
+            if self._pending_voice_count() >= self.config.max_scheduled_events:
+                raise RuntimeError("scheduled event limit reached")
+            if self._capacity_conflicts(candidate):
+                raise RuntimeError(
+                    "active voice capacity unavailable for requested dry interval"
+                )
+            return self._append_voice(
+                source,
+                start_sample,
+                dry_end_sample,
+                impact_priority=None,
+            )
+
+        excluded: set[int] = set()
+        while True:
+            conflicts = self._capacity_conflicts(candidate, excluded)
+            scheduled_full = (
+                self._pending_voice_count(excluded)
+                >= self.config.max_scheduled_events
+            )
+            if not conflicts and not scheduled_full:
+                break
+            eligible_ids = conflicts or frozenset(
+                voice.voice_id
+                for voice in self._voices
+                if voice.start_sample > self._sample_cursor
+            )
+            removable = [
+                voice
+                for voice in self._voices
+                if voice.voice_id in eligible_ids
+                and voice.voice_id not in excluded
+                and voice.start_sample > self._sample_cursor
+                and voice.impact_priority is not None
+                and voice.impact_priority < impact_priority
+            ]
+            if not removable:
+                return None
+            victim = min(
+                removable,
+                key=lambda voice: (voice.impact_priority, -voice.voice_id),
+            )
+            excluded.add(victim.voice_id)
+
+        if excluded:
+            self._voices = [
+                voice for voice in self._voices if voice.voice_id not in excluded
+            ]
+        return self._append_voice(
+            source,
+            start_sample,
+            dry_end_sample,
+            impact_priority=impact_priority,
+        )
 
     def stop(self, source_id: str, *, delay_s: float = 0.0) -> None:
         """Schedule all voices of a registered source to stop."""
@@ -228,9 +415,7 @@ class BinauralRenderer:
         self._fdn.reset()
 
     def _voice_is_dry_active(self, voice: _Voice, sample_index: int) -> bool:
-        end = voice.dry_end_sample
-        if voice.stop_sample is not None:
-            end = voice.stop_sample if end is None else min(end, voice.stop_sample)
+        end = self._dry_end_sample(voice)
         return voice.start_sample <= sample_index and (end is None or sample_index < end)
 
     def _voice_block(self, voice: _Voice, sample_count: int) -> FloatArray:
@@ -300,10 +485,13 @@ class BinauralRenderer:
         listener_position, head_rotation = scene.listener_pose()
         listener_position = np.asarray(listener_position, dtype=np.float64)
         head_rotation = np.asarray(head_rotation, dtype=np.float64).reshape(3, 3)
+        current_block = self._sample_cursor // sample_count
         active_dry = sum(
-            self._voice_is_dry_active(voice, self._sample_cursor)
-            or self._voice_is_dry_active(voice, self._sample_cursor + sample_count - 1)
+            interval is not None
+            and interval[0] <= current_block
+            and (interval[1] is None or current_block < interval[1])
             for voice in self._voices
+            if (interval := self._voice_dry_block_interval(voice)) is not None
         )
         if active_dry > self.config.max_active_voices:
             raise RuntimeError("active voice limit reached")
