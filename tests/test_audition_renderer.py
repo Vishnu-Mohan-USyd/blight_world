@@ -390,6 +390,30 @@ def test_continuous_stream_tracks_moving_attachment_with_stable_state() -> None:
     )
 
 
+def test_continuous_stream_accepts_updated_position_on_same_anchor() -> None:
+    """A live contact centroid can move while retaining one spatial voice."""
+
+    renderer, scene = _renderer(
+        (1.0, 0.0, 0.0),
+        continuous=ContinuousSoundConfig(),
+    )
+    first = _emission("centroid")
+    renderer.render_substep(scene, (first,))
+    voice = renderer._continuous_voices["centroid"]
+    identity = id(voice)
+    moved = ContinuousEmission(
+        "centroid",
+        "fixture",
+        StaticAttachment((1.0, 0.1, 0.0)),
+        first.samples_pa_at_1m,
+    )
+
+    renderer.render_substep(scene, (moved,))
+
+    assert id(renderer._continuous_voices["centroid"]) == identity
+    assert renderer._continuous_voices["centroid"].attachment == moved.attachment
+
+
 def test_continuous_priority_admission_is_deterministic_top_four() -> None:
     """Priority descending and stream ID ascending select the bounded pool."""
 

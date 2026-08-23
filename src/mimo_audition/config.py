@@ -18,11 +18,10 @@ def _positive_int(name: str, value: int) -> None:
 
 @dataclass(frozen=True, slots=True)
 class ScrapeConfig:
-    """Validated future scrape-generator thresholds and pressure bounds.
+    """Validated scrape-generator thresholds and pressure bounds.
 
     These are practical engineering defaults, not measured biological
-    calibration. Phase A exposes the frozen contract but does not synthesize
-    scrape audio.
+    calibration.
     """
 
     enabled: bool = True

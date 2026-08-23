@@ -20,7 +20,13 @@ from mimo_audition.room import (
     first_order_image_sources,
     project_source_position,
 )
-from mimo_audition.sources import Attachment, AudioSourceSpec
+from mimo_audition.sources import (
+    Attachment,
+    AudioSourceSpec,
+    BodyAttachment,
+    SiteAttachment,
+    StaticAttachment,
+)
 
 
 FloatArray = NDArray[np.float64]
@@ -549,6 +555,26 @@ class BinauralRenderer:
             ),
         )
 
+    @staticmethod
+    def _same_continuous_attachment_anchor(
+        previous: Attachment,
+        current: Attachment,
+    ) -> bool:
+        """Allow a stream's position to move without changing its anchor."""
+
+        if isinstance(previous, StaticAttachment):
+            return isinstance(current, StaticAttachment)
+        if isinstance(previous, BodyAttachment):
+            return (
+                isinstance(current, BodyAttachment)
+                and previous.body_name == current.body_name
+            )
+        return (
+            isinstance(previous, SiteAttachment)
+            and isinstance(current, SiteAttachment)
+            and previous.site_name == current.site_name
+        )
+
     def _select_continuous_emissions(
         self,
         emissions: Sequence[ContinuousEmission],
@@ -709,10 +735,15 @@ class BinauralRenderer:
                 self._continuous_voices[stream_id] = self._new_continuous_voice(
                     emission
                 )
-            elif voice.kind != emission.kind or voice.attachment != emission.attachment:
+            elif voice.kind != emission.kind or not self._same_continuous_attachment_anchor(
+                voice.attachment,
+                emission.attachment,
+            ):
                 raise ValueError(
                     f"continuous stream identity changed for stream_id: {stream_id}"
                 )
+            else:
+                voice.attachment = emission.attachment
 
         output = np.zeros((2, sample_count), dtype=np.float64)
         reverb_input = np.zeros(sample_count, dtype=np.float64)

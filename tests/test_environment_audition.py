@@ -16,6 +16,7 @@ from blight_world import (
     BodyAttachment,
     ContinuousEmission,
     ContinuousSoundConfig,
+    ScrapeConfig,
     SiteAttachment,
     StaticAttachment,
 )
@@ -210,12 +211,17 @@ def test_sensor_routes_continuous_blocks_only_when_explicitly_enabled() -> None:
         width=16,
         height=12,
         audition=AuditionConfig.quality_48k(
-            continuous=ContinuousSoundConfig()
+            continuous=ContinuousSoundConfig(
+                scrape=ScrapeConfig(enabled=False)
+            )
         ),
     )
     try:
         disabled.reset(seed=7)
         assert disabled.audition is not None
+        assert disabled.audition._scrapes is None
+        assert disabled.audition._scrape_synthesizer is None
+        assert disabled.audition.scrape_diagnostics == ()
         disabled.audition.capture_substep((emission,))
         disabled.audition.capture_substep((emission,))
         disabled_pressure = disabled.audition.finish_step()
@@ -225,6 +231,8 @@ def test_sensor_routes_continuous_blocks_only_when_explicitly_enabled() -> None:
 
         enabled.reset(seed=7)
         assert enabled.audition is not None
+        assert enabled.audition._scrapes is None
+        assert enabled.audition._scrape_synthesizer is None
         enabled.audition.capture_substep((emission,))
         assert enabled.audition.renderer.continuous_active_stream_ids == (
             "manual-ball-stream",

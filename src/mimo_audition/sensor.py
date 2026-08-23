@@ -14,6 +14,11 @@ from mimo_audition.continuous import ContinuousEmission
 from mimo_audition.contacts import ImpactDetector
 from mimo_audition.mujoco_scene import MujocoAcousticScene
 from mimo_audition.renderer import BinauralRenderer
+from mimo_audition.scrape import (
+    ScrapeDiagnostic,
+    ScrapeSynthesizer,
+    ScrapeTracker,
+)
 from mimo_audition.sources import AudioSourceSpec
 
 
@@ -33,6 +38,21 @@ class MIMoAudition:
         self.renderer = BinauralRenderer(config)
         self._rng = np.random.default_rng(np.random.SeedSequence(0).spawn(1)[0])
         self._impacts = ImpactDetector(model, data, self._rng)
+        scrape_config = (
+            config.continuous.scrape
+            if config.continuous is not None and config.continuous.scrape.enabled
+            else None
+        )
+        self._scrapes = (
+            ScrapeTracker(model, data, scrape_config)
+            if scrape_config is not None
+            else None
+        )
+        self._scrape_synthesizer = (
+            ScrapeSynthesizer(config.spec, scrape_config)
+            if scrape_config is not None
+            else None
+        )
         self._pending_substeps: list[NDArray[np.float64]] = []
         self._cache = np.zeros(config.spec.observation_shape, dtype=np.float32)
 
@@ -47,6 +67,14 @@ class MIMoAudition:
         """Clip library used by registered and physical sources."""
 
         return self.renderer.clips
+
+    @property
+    def scrape_diagnostics(self) -> tuple[ScrapeDiagnostic, ...]:
+        """Return immutable generator diagnostics outside Gym observations."""
+
+        if self._scrape_synthesizer is None:
+            return ()
+        return self._scrape_synthesizer.diagnostics
 
     def register_source(self, source: AudioSourceSpec) -> None:
         """Validate a MuJoCo attachment and register a playable source."""
@@ -71,6 +99,9 @@ class MIMoAudition:
         self._rng = np.random.default_rng(child_seed)
         self.renderer.reset()
         self._impacts.reset(self._rng)
+        if self._scrapes is not None and self._scrape_synthesizer is not None:
+            self._scrapes.reset()
+            self._scrape_synthesizer.reset(seed)
         self._pending_substeps.clear()
         self._cache.fill(0)
 
@@ -78,6 +109,8 @@ class MIMoAudition:
         """Capture pre-integration velocities for impact approach estimates."""
 
         self._impacts.before_substep()
+        if self._scrapes is not None:
+            self._scrapes.before_substep()
 
     def capture_substep(
         self,
@@ -93,9 +126,15 @@ class MIMoAudition:
                 delay_s=0.010,
                 impact_energy_j=event.energy_j,
             )
-        emissions = (
-            continuous_emissions if self.config.continuous is not None else ()
-        )
+        emissions: tuple[ContinuousEmission, ...]
+        if self.config.continuous is None:
+            emissions = ()
+        else:
+            emissions = tuple(continuous_emissions)
+            if self._scrapes is not None and self._scrape_synthesizer is not None:
+                emissions += self._scrape_synthesizer.render(
+                    self._scrapes.detect()
+                )
         self._pending_substeps.append(
             self.renderer.render_substep(self.scene, emissions)
         )

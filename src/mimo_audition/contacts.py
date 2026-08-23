@@ -9,26 +9,15 @@ import mujoco
 import numpy as np
 from numpy.typing import NDArray
 
+from mimo_audition.materials import (
+    IMPACT_PAIRS,
+    AcousticMaterialResolver,
+    canonical_material_pair,
+)
 from mimo_audition.sources import BodyAttachment
 
 
 FloatArray = NDArray[np.float64]
-MATERIAL_ORDER = ("hard", "wood", "rubber", "plastic", "soft")
-IMPACT_PAIRS = frozenset(
-    {
-        ("hard", "wood"),
-        ("hard", "rubber"),
-        ("hard", "plastic"),
-        ("hard", "soft"),
-        ("wood", "wood"),
-        ("wood", "rubber"),
-        ("wood", "plastic"),
-        ("wood", "soft"),
-        ("rubber", "plastic"),
-        ("rubber", "soft"),
-        ("plastic", "soft"),
-    }
-)
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,13 +39,6 @@ def impact_amplitude(energy_j: float) -> float:
     return float(np.clip(np.sqrt(energy_j / 0.01), 0.25, 4.0))
 
 
-def _canonical_material_pair(first: str, second: str) -> tuple[str, str]:
-    indices = {material: index for index, material in enumerate(MATERIAL_ORDER)}
-    if first not in indices or second not in indices:
-        raise ValueError("unknown acoustic material")
-    return (first, second) if indices[first] <= indices[second] else (second, first)
-
-
 class ImpactDetector:
     """Detect new energetic contacts from pre/post MuJoCo substep state."""
 
@@ -74,6 +56,7 @@ class ImpactDetector:
         self._previous_pairs: set[tuple[int, int]] = set()
         self._last_event_time: dict[tuple[int, int], float] = {}
         self._mimo_root_id = model.body("mimo_location").id
+        self._materials = AcousticMaterialResolver(model)
         self.reset(rng)
 
     def reset(self, rng: np.random.Generator) -> None:
@@ -111,19 +94,6 @@ class ImpactDetector:
             angular,
             world_position_m - self._pre_body_position[body_id],
         )
-
-    def _material(self, geom_id: int) -> str:
-        name = mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_GEOM, geom_id) or ""
-        body_id = int(self.model.geom_bodyid[geom_id])
-        if int(self.model.body_rootid[body_id]) == self._mimo_root_id:
-            return "soft"
-        if name == "block_geom" or name.startswith("table_"):
-            return "wood"
-        if name == "ball_geom":
-            return "rubber"
-        if name == "cylinder_geom":
-            return "plastic"
-        return "hard"
 
     def _eligible_bodies(self, body_a: int, body_b: int) -> bool:
         static_a = int(self.model.body_weldid[body_a]) == 0
@@ -167,9 +137,9 @@ class ImpactDetector:
             approach_m_s = float(np.dot(velocity_a - velocity_b, normal))
             if approach_m_s < 0.05:
                 continue
-            material_pair = _canonical_material_pair(
-                self._material(geom_a),
-                self._material(geom_b),
+            material_pair = canonical_material_pair(
+                self._materials.material(geom_a),
+                self._materials.material(geom_b),
             )
             if material_pair not in IMPACT_PAIRS:
                 continue
