@@ -14,6 +14,8 @@ from blight_world import (
     AudioSourceSpec,
     BlightWorldEnv,
     BodyAttachment,
+    ContinuousEmission,
+    ContinuousSoundConfig,
     SiteAttachment,
     StaticAttachment,
 )
@@ -188,6 +190,54 @@ def test_training_profile_exposes_24khz_live_audio() -> None:
         assert np.max(np.abs(observation["audition"])) > 0
     finally:
         environment.close()
+
+
+def test_sensor_routes_continuous_blocks_only_when_explicitly_enabled() -> None:
+    """Sensor accepts emissions while disabled mode passes an exact empty set."""
+
+    emission = ContinuousEmission(
+        "manual-ball-stream",
+        "fixture",
+        BodyAttachment("ball"),
+        np.full(240, 0.01, dtype=np.float32),
+    )
+    disabled = BlightWorldEnv(
+        width=16,
+        height=12,
+        audition=AuditionConfig.quality_48k(),
+    )
+    enabled = BlightWorldEnv(
+        width=16,
+        height=12,
+        audition=AuditionConfig.quality_48k(
+            continuous=ContinuousSoundConfig()
+        ),
+    )
+    try:
+        disabled.reset(seed=7)
+        assert disabled.audition is not None
+        disabled.audition.capture_substep((emission,))
+        disabled.audition.capture_substep((emission,))
+        disabled_pressure = disabled.audition.finish_step()
+        assert np.count_nonzero(disabled_pressure) == 0
+        assert disabled.audition.renderer.continuous_active_voice_count == 0
+        assert disabled.audition.renderer.continuous_retained_voice_count == 0
+
+        enabled.reset(seed=7)
+        assert enabled.audition is not None
+        enabled.audition.capture_substep((emission,))
+        assert enabled.audition.renderer.continuous_active_stream_ids == (
+            "manual-ball-stream",
+        )
+        enabled.audition.capture_substep((emission,))
+        enabled_pressure = enabled.audition.finish_step()
+        assert enabled_pressure.shape == (2, 480)
+        assert enabled_pressure.dtype == np.float32
+        assert np.all(np.isfinite(enabled_pressure))
+        assert np.max(np.abs(enabled_pressure)) > 0
+    finally:
+        disabled.close()
+        enabled.close()
 
 
 def test_enabling_audition_does_not_change_rgb_or_proprioception(

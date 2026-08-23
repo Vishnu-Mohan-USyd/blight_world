@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 import mujoco
 import numpy as np
 from numpy.typing import NDArray
 
 from mimo_audition.clips import ClipLibrary
 from mimo_audition.config import AuditionConfig
+from mimo_audition.continuous import ContinuousEmission
 from mimo_audition.contacts import ImpactDetector
 from mimo_audition.mujoco_scene import MujocoAcousticScene
 from mimo_audition.renderer import BinauralRenderer
@@ -76,7 +79,10 @@ class MIMoAudition:
 
         self._impacts.before_substep()
 
-    def capture_substep(self) -> None:
+    def capture_substep(
+        self,
+        continuous_emissions: Sequence[ContinuousEmission] = (),
+    ) -> None:
         """Schedule new impacts and render one 5 ms acoustic interval."""
 
         for event in self._impacts.detect():
@@ -87,7 +93,12 @@ class MIMoAudition:
                 delay_s=0.010,
                 impact_energy_j=event.energy_j,
             )
-        self._pending_substeps.append(self.renderer.render_substep(self.scene))
+        emissions = (
+            continuous_emissions if self.config.continuous is not None else ()
+        )
+        self._pending_substeps.append(
+            self.renderer.render_substep(self.scene, emissions)
+        )
 
     def finish_step(self) -> NDArray[np.float32]:
         """Publish exactly two substeps as one Gymnasium observation block."""

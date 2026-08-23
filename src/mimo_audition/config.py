@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from math import isclose
+from dataclasses import dataclass, field
+from math import isclose, isfinite
 
 
 PHYSICS_TIMESTEP_S = 0.005
@@ -14,6 +14,82 @@ SPEED_OF_SOUND_M_S = 343.0
 def _positive_int(name: str, value: int) -> None:
     if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
         raise ValueError(f"{name} must be a positive integer")
+
+
+@dataclass(frozen=True, slots=True)
+class ScrapeConfig:
+    """Validated future scrape-generator thresholds and pressure bounds.
+
+    These are practical engineering defaults, not measured biological
+    calibration. Phase A exposes the frozen contract but does not synthesize
+    scrape audio.
+    """
+
+    enabled: bool = True
+    minimum_contact_substeps: int = 2
+    normal_force_on_n: float = 0.10
+    normal_force_off_n: float = 0.05
+    slip_speed_on_m_s: float = 0.02
+    slip_speed_off_m_s: float = 0.01
+    attack_seconds: float = 0.010
+    release_seconds: float = 0.030
+    power_smoothing_seconds: float = 0.010
+    reference_friction_power_w: float = 0.10
+    reference_rms_pressure_pa_at_1m: float = 0.005
+    max_rms_pressure_pa_at_1m: float = 0.05
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.enabled, bool):
+            raise TypeError("enabled must be a bool")
+        _positive_int("minimum_contact_substeps", self.minimum_contact_substeps)
+        positive_fields = (
+            "normal_force_on_n",
+            "normal_force_off_n",
+            "slip_speed_on_m_s",
+            "slip_speed_off_m_s",
+            "attack_seconds",
+            "release_seconds",
+            "power_smoothing_seconds",
+            "reference_friction_power_w",
+            "reference_rms_pressure_pa_at_1m",
+            "max_rms_pressure_pa_at_1m",
+        )
+        for name in positive_fields:
+            value = getattr(self, name)
+            if not isfinite(value) or value <= 0:
+                raise ValueError(f"{name} must be finite and positive")
+        if self.normal_force_off_n > self.normal_force_on_n:
+            raise ValueError("normal_force_off_n cannot exceed normal_force_on_n")
+        if self.slip_speed_off_m_s > self.slip_speed_on_m_s:
+            raise ValueError("slip_speed_off_m_s cannot exceed slip_speed_on_m_s")
+        if (
+            self.max_rms_pressure_pa_at_1m
+            < self.reference_rms_pressure_pa_at_1m
+        ):
+            raise ValueError(
+                "max_rms_pressure_pa_at_1m cannot be below reference pressure"
+            )
+
+
+@dataclass(frozen=True, slots=True)
+class ContinuousSoundConfig:
+    """Bounded persistent-stream settings for continuous sound rendering."""
+
+    max_continuous_voices: int = 4
+    unexpected_disappearance_fade_seconds: float = 0.005
+    scrape: ScrapeConfig = field(default_factory=ScrapeConfig)
+
+    def __post_init__(self) -> None:
+        _positive_int("max_continuous_voices", self.max_continuous_voices)
+        if self.max_continuous_voices > 32:
+            raise ValueError("max_continuous_voices cannot exceed 32")
+        fade = self.unexpected_disappearance_fade_seconds
+        if not isfinite(fade) or fade < 0:
+            raise ValueError(
+                "unexpected_disappearance_fade_seconds must be finite and non-negative"
+            )
+        if not isinstance(self.scrape, ScrapeConfig):
+            raise TypeError("scrape must be a ScrapeConfig")
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,6 +163,7 @@ class AuditionConfig:
     enable_first_order_reflections: bool = True
     enable_late_reverb: bool = True
     late_reverb_send: float = 0.12
+    continuous: ContinuousSoundConfig | None = None
 
     def __post_init__(self) -> None:
         AuditionSpec(self.sample_rate_hz)
@@ -112,6 +189,11 @@ class AuditionConfig:
             raise ValueError("occlusion_attenuation_db must be non-positive")
         if self.late_reverb_send < 0:
             raise ValueError("late_reverb_send must be non-negative")
+        if self.continuous is not None and not isinstance(
+            self.continuous,
+            ContinuousSoundConfig,
+        ):
+            raise TypeError("continuous must be a ContinuousSoundConfig or None")
 
     @classmethod
     def quality_48k(cls, **overrides: object) -> AuditionConfig:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from math import isfinite
 from typing import Protocol
@@ -11,6 +12,7 @@ from numpy.typing import NDArray
 
 from mimo_audition.clips import ClipLibrary
 from mimo_audition.config import AuditionConfig
+from mimo_audition.continuous import ContinuousEmission
 from mimo_audition.dsp import AttackReleaseSmoother, FractionalDelayLine, OnePoleLowpass
 from mimo_audition.hrtf import HrtfBank, PairedHrtfConvolver, load_packaged_hrtf
 from mimo_audition.room import (
@@ -63,6 +65,23 @@ class _Voice:
     dry_end_sample: int | None = None
 
 
+@dataclass(slots=True)
+class _ContinuousVoice:
+    stream_id: str
+    kind: str
+    attachment: Attachment
+    paths: list[_PathState]
+    occlusion_smoother: AttackReleaseSmoother
+    occlusion_lowpass: OnePoleLowpass
+    previous_listener_position_m: FloatArray | None = None
+    previous_source_position_m: FloatArray | None = None
+    last_dry_sample: float = 0.0
+    release_start_sample: float = 0.0
+    release_total_samples: int = 0
+    release_elapsed_samples: int = 0
+    dry_end_sample: int | None = None
+
+
 class BinauralRenderer:
     """Position mono clips in a MuJoCo-compatible binaural sound field."""
 
@@ -92,6 +111,9 @@ class BinauralRenderer:
         self._next_voice_id = 1
         self._sample_cursor = 0
         self._fdn = FeedbackDelayNetwork(config.sample_rate_hz)
+        self._continuous_voices: dict[str, _ContinuousVoice] = {}
+        self._continuous_active_stream_ids: tuple[str, ...] = ()
+        self._continuous_dropped_stream_ids: tuple[str, ...] = ()
 
     @property
     def sample_cursor(self) -> int:
@@ -110,6 +132,30 @@ class BinauralRenderer:
         """Number of voices whose dry clip is active at the current clock."""
 
         return sum(self._voice_is_dry_active(voice, self._sample_cursor) for voice in self._voices)
+
+    @property
+    def continuous_active_voice_count(self) -> int:
+        """Number of admitted continuous dry streams in the latest substep."""
+
+        return len(self._continuous_active_stream_ids)
+
+    @property
+    def continuous_retained_voice_count(self) -> int:
+        """Continuous states retained for dry input, release, or spatial tails."""
+
+        return len(self._continuous_voices)
+
+    @property
+    def continuous_active_stream_ids(self) -> tuple[str, ...]:
+        """Latest admitted stream IDs in deterministic priority order."""
+
+        return self._continuous_active_stream_ids
+
+    @property
+    def continuous_dropped_stream_ids(self) -> tuple[str, ...]:
+        """Latest capacity-dropped input stream IDs in deterministic order."""
+
+        return self._continuous_dropped_stream_ids
 
     def _new_paths(self) -> list[_PathState]:
         path_count = 7 if self.config.enable_first_order_reflections else 1
@@ -413,6 +459,9 @@ class BinauralRenderer:
         self._next_voice_id = 1
         self._sample_cursor = 0
         self._fdn.reset()
+        self._continuous_voices.clear()
+        self._continuous_active_stream_ids = ()
+        self._continuous_dropped_stream_ids = ()
 
     def _voice_is_dry_active(self, voice: _Voice, sample_index: int) -> bool:
         end = self._dry_end_sample(voice)
@@ -478,10 +527,238 @@ class BinauralRenderer:
         attenuation = pressure_gain / max(distance_m, self.config.distance_floor_m)
         return state.hrtf.process(delayed * attenuation, direction_index)
 
-    def render_substep(self, scene: AcousticScene) -> FloatArray:
+    def _new_continuous_voice(
+        self,
+        emission: ContinuousEmission,
+    ) -> _ContinuousVoice:
+        """Allocate persistent spatial state for one newly admitted stream."""
+
+        return _ContinuousVoice(
+            stream_id=emission.stream_id,
+            kind=emission.kind,
+            attachment=emission.attachment,
+            paths=self._new_paths(),
+            occlusion_smoother=AttackReleaseSmoother(
+                self.config.occlusion_attack_s,
+                self.config.occlusion_release_s,
+                self.config.sample_rate_hz,
+            ),
+            occlusion_lowpass=OnePoleLowpass(
+                self.config.occlusion_cutoff_hz,
+                self.config.sample_rate_hz,
+            ),
+        )
+
+    def _select_continuous_emissions(
+        self,
+        emissions: Sequence[ContinuousEmission],
+    ) -> dict[str, ContinuousEmission]:
+        """Validate and admit deterministic priority-ranked continuous streams."""
+
+        continuous_config = self.config.continuous
+        if continuous_config is None:
+            if emissions:
+                raise RuntimeError("continuous sound is disabled")
+            return {}
+
+        by_stream_id: dict[str, ContinuousEmission] = {}
+        for emission in emissions:
+            if not isinstance(emission, ContinuousEmission):
+                raise TypeError("continuous emissions must be ContinuousEmission values")
+            if emission.samples_pa_at_1m.size != self.spec.samples_per_substep:
+                raise ValueError(
+                    "continuous emission block does not match renderer sample rate"
+                )
+            if emission.stream_id in by_stream_id:
+                raise ValueError(
+                    f"duplicate continuous stream_id: {emission.stream_id}"
+                )
+            by_stream_id[emission.stream_id] = emission
+
+        ranked = sorted(
+            by_stream_id.values(),
+            key=lambda emission: (-emission.priority, emission.stream_id),
+        )
+        admitted = ranked[: continuous_config.max_continuous_voices]
+        dropped = ranked[continuous_config.max_continuous_voices :]
+        self._continuous_active_stream_ids = tuple(
+            emission.stream_id for emission in admitted
+        )
+        self._continuous_dropped_stream_ids = tuple(
+            emission.stream_id for emission in dropped
+        )
+        return {emission.stream_id: emission for emission in admitted}
+
+    def _continuous_release_block(
+        self,
+        voice: _ContinuousVoice,
+        sample_count: int,
+    ) -> FloatArray:
+        """Fade a vanished stream's final sample once, then provide zero input."""
+
+        continuous_config = self.config.continuous
+        if continuous_config is None:
+            raise AssertionError("continuous release requires enabled configuration")
+        if voice.dry_end_sample is None:
+            total = round(
+                continuous_config.unexpected_disappearance_fade_seconds
+                * self.config.sample_rate_hz
+            )
+            voice.release_start_sample = voice.last_dry_sample
+            voice.release_total_samples = total
+            voice.release_elapsed_samples = 0
+            voice.dry_end_sample = self._sample_cursor + total
+
+        output = np.zeros(sample_count, dtype=np.float64)
+        total = voice.release_total_samples
+        elapsed = voice.release_elapsed_samples
+        if total > 0 and elapsed < total:
+            count = min(sample_count, total - elapsed)
+            positions = elapsed + np.arange(1, count + 1, dtype=np.float64)
+            output[:count] = voice.release_start_sample * (1.0 - positions / total)
+            voice.release_elapsed_samples += count
+        return output
+
+    def _render_continuous_spatial_block(
+        self,
+        voice: _ContinuousVoice,
+        mono: FloatArray,
+        scene: AcousticScene,
+        listener_position: FloatArray,
+        head_rotation: FloatArray,
+    ) -> tuple[FloatArray, FloatArray]:
+        """Route one continuous block through persistent spatial path state."""
+
+        source_position, source_body_id = scene.attachment_pose(voice.attachment)
+        source_position = project_source_position(source_position)
+        previous_listener = (
+            listener_position
+            if voice.previous_listener_position_m is None
+            else voice.previous_listener_position_m
+        )
+        previous_source = (
+            source_position
+            if voice.previous_source_position_m is None
+            else voice.previous_source_position_m
+        )
+
+        output = np.zeros((2, mono.size), dtype=np.float64)
+        direct_mono = mono
+        if self.config.enable_occlusion:
+            is_occluded = scene.direct_path_occluded(
+                listener_position,
+                source_position,
+                source_body_id,
+            )
+            mix = voice.occlusion_smoother.process(is_occluded, mono.size)
+            lowpassed = voice.occlusion_lowpass.process(mono)
+            blocked_gain = 10.0 ** (self.config.occlusion_attenuation_db / 20.0)
+            direct_mono = mono * (1.0 - mix) + lowpassed * blocked_gain * mix
+        output += self._render_path(
+            voice.paths[0],
+            direct_mono,
+            listener_position,
+            head_rotation,
+            source_position,
+            previous_listener,
+            previous_source,
+            1.0,
+        )
+
+        if self.config.enable_first_order_reflections:
+            current_images = first_order_image_sources(source_position)
+            previous_images = first_order_image_sources(previous_source)
+            for path_index, (current_image, previous_image) in enumerate(
+                zip(current_images, previous_images, strict=True),
+                start=1,
+            ):
+                output += self._render_path(
+                    voice.paths[path_index],
+                    mono,
+                    listener_position,
+                    head_rotation,
+                    current_image.world_position_m,
+                    previous_listener,
+                    previous_image.world_position_m,
+                    current_image.pressure_reflection,
+                )
+
+        distance = max(
+            float(np.linalg.norm(source_position - listener_position)),
+            self.config.distance_floor_m,
+        )
+        reverb_input = mono * self.config.late_reverb_send / distance
+        voice.previous_listener_position_m = listener_position.copy()
+        voice.previous_source_position_m = source_position.copy()
+        return output, reverb_input
+
+    def _render_continuous_substep(
+        self,
+        scene: AcousticScene,
+        emissions: Sequence[ContinuousEmission],
+        listener_position: FloatArray,
+        head_rotation: FloatArray,
+    ) -> tuple[FloatArray, FloatArray]:
+        """Render admitted streams plus finite release and spatial-tail state."""
+
+        sample_count = self.spec.samples_per_substep
+        admitted = self._select_continuous_emissions(emissions)
+        for stream_id, emission in admitted.items():
+            voice = self._continuous_voices.get(stream_id)
+            if voice is None:
+                self._continuous_voices[stream_id] = self._new_continuous_voice(
+                    emission
+                )
+            elif voice.kind != emission.kind or voice.attachment != emission.attachment:
+                raise ValueError(
+                    f"continuous stream identity changed for stream_id: {stream_id}"
+                )
+
+        output = np.zeros((2, sample_count), dtype=np.float64)
+        reverb_input = np.zeros(sample_count, dtype=np.float64)
+        retained: dict[str, _ContinuousVoice] = {}
+        tail_samples = 8_192 + self.hrtf_bank.tap_count
+        for stream_id in sorted(self._continuous_voices):
+            voice = self._continuous_voices[stream_id]
+            emission = admitted.get(stream_id)
+            if emission is None:
+                mono = self._continuous_release_block(voice, sample_count)
+            else:
+                mono = np.asarray(emission.samples_pa_at_1m, dtype=np.float64)
+                voice.last_dry_sample = float(mono[-1])
+                voice.release_start_sample = 0.0
+                voice.release_total_samples = 0
+                voice.release_elapsed_samples = 0
+                voice.dry_end_sample = None
+
+            spatial, reverb = self._render_continuous_spatial_block(
+                voice,
+                mono,
+                scene,
+                listener_position,
+                head_rotation,
+            )
+            output += spatial
+            reverb_input += reverb
+            dry_end = voice.dry_end_sample
+            if (
+                dry_end is None
+                or self._sample_cursor + sample_count < dry_end + tail_samples
+            ):
+                retained[stream_id] = voice
+        self._continuous_voices = retained
+        return output, reverb_input
+
+    def render_substep(
+        self,
+        scene: AcousticScene,
+        continuous_emissions: Sequence[ContinuousEmission] = (),
+    ) -> FloatArray:
         """Render exactly one 5 ms physics interval from the current scene."""
 
         sample_count = self.spec.samples_per_substep
+        if self.config.continuous is None and continuous_emissions:
+            raise RuntimeError("continuous sound is disabled")
         listener_position, head_rotation = scene.listener_pose()
         listener_position = np.asarray(listener_position, dtype=np.float64)
         head_rotation = np.asarray(head_rotation, dtype=np.float64).reshape(3, 3)
@@ -570,6 +847,15 @@ class BinauralRenderer:
                 retained_voices.append(voice)
 
         self._voices = retained_voices
+        if self.config.continuous is not None:
+            continuous_output, continuous_reverb = self._render_continuous_substep(
+                scene,
+                continuous_emissions,
+                listener_position,
+                head_rotation,
+            )
+            output += continuous_output
+            reverb_input += continuous_reverb
         if self.config.enable_late_reverb:
             output += self._fdn.process(reverb_input)
         self._sample_cursor += sample_count

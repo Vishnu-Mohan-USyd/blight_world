@@ -6,6 +6,9 @@ from mimo_audition import (
     AuditionSpec,
     AudioSourceSpec,
     BodyAttachment,
+    ContinuousEmission,
+    ContinuousSoundConfig,
+    ScrapeConfig,
     SiteAttachment,
     StaticAttachment,
 )
@@ -16,6 +19,9 @@ __all__ = [
     "AudioSourceSpec",
     "BlightWorldEnv",
     "BodyAttachment",
+    "ContinuousEmission",
+    "ContinuousSoundConfig",
+    "ScrapeConfig",
     "SiteAttachment",
     "StaticAttachment",
 ]
