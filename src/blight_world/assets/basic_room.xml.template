@@ -28,6 +28,15 @@
 
   <include file="{{MIMO_META_XML}}"/>
 
+  <contact>
+    <pair geom1="ball_geom" geom2="table_top" condim="3"
+          solref=".015 .40" friction=".55 .55 .01 .002 .002"/>
+    <pair geom1="block_geom" geom2="table_top" condim="3"
+          friction=".30 .30 .02 .001 .001"/>
+    <pair geom1="cylinder_geom" geom2="table_top" condim="6"
+          friction=".50 .50 .02 .025 .025"/>
+  </contact>
+
   <worldbody>
     <light name="key_light" pos="0.4 -1.2 2.2" dir="0.3 0.2 -1"
            directional="true" diffuse="0.9 0.9 0.9"/>
@@ -81,4 +90,5 @@
       <include file="{{MIMO_MODEL_XML}}"/>
     </body>
   </worldbody>
+  {{SCENE_EXTENSION_XML}}
 </mujoco>

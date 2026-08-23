@@ -28,6 +28,7 @@ from tools.export_audition_demo import (
     VIDEO_FRAMES,
     VIDEO_HEIGHT,
     VIDEO_WIDTH,
+    EXPECTED_BALL_IMPACTS,
     _apply_substep_fixture,
     _free_joint_addresses,
     _ild_db,
@@ -169,11 +170,35 @@ def test_full_demo_timeline_replays_public_audio_and_scrape_windows(
 
     assert manifest["raw_sources"][
         "audio_pressure_pa_channels_first_float32_sha256"
-    ] == "7898fb4d777edb9dcf03e64c62553235ac90e5874df0f91bf0f3c2df803b53a5"
+    ] == "d51749cec3e3e76739f8be7077dea40cf153bcf11a213d6cd9bd8ddf4ef1229b"
     assert round(
         manifest["media_pressure_mapping"]["peak_pressure_pa"],
         4,
-    ) == 0.7284
+    ) == 0.8566
+    assert manifest["configuration"]["behavior_label"] == (
+        "kinematically_constrained_external_camera_audition_diagnostic"
+    )
+    assert manifest["configuration"]["contact_physics"] == (
+        "current production scene contact pairs"
+    )
+    ball_events = [
+        event
+        for event in manifest["storyboard_evidence"]["impact_events"]
+        if event["clip_id"].startswith("impact_wood_rubber_")
+    ]
+    assert len(ball_events) == 4
+    assert all(event["accepted"] for event in ball_events)
+    for event, (expected_time, expected_clip, expected_energy) in zip(
+        ball_events,
+        EXPECTED_BALL_IMPACTS,
+        strict=True,
+    ):
+        assert event["clip_id"] == expected_clip
+        assert event["simulation_time_s"] == pytest.approx(expected_time, abs=1e-12)
+        assert event["impact_energy_j"] == pytest.approx(
+            expected_energy,
+            abs=5e-13,
+        )
     windows = manifest["storyboard_evidence"]["scrape_windows"]
     assert windows["scrape:6:11"] == {
         "first_active_time_s": pytest.approx(2.215),

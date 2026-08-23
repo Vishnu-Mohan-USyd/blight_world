@@ -15,3 +15,11 @@
 - Copy caller-owned numerical arrays before marking internal state read-only.
 - Account for streaming propagation and FIR transients before measuring a
   steady-state acoustic ratio.
+- For user-facing embodiment demos, capture the sensor streams the user asked
+  to inspect (for example, the two public eye observations), not a convenient
+  external camera unless it is explicitly requested and labelled.
+- Never present a kinematically clamped validation fixture as evidence of
+  natural physics or autonomous interaction. After one-time staging, physical
+  demos must drive objects through MuJoCo forces, actuators, constraints, and
+  contacts, and must validate velocity, rebound, deceleration, and bounds from
+  recorded trajectories.

@@ -1,9 +1,11 @@
-"""Export a deterministic audiovisual demonstration of BlightWorld audition.
+"""Export a deterministic external-camera diagnostic of BlightWorld audition.
 
 The eight-second storyboard uses kinematically constrained validation fixtures
-and a scripted head/right-arm pose. It is not autonomous or learned behavior.
-Audio is taken only from the public ``observation["audition"]`` transport and
-is written without gain control, normalization, or clipping.
+and a scripted head/right-arm pose with the production scene's current contact
+physics.  It is not a physical-behavior demonstration, autonomous behavior, or
+learned behavior.  Audio is taken only from the public
+``observation["audition"]`` transport and is written without gain control,
+normalization, or clipping; video comes from an explicitly external camera.
 """
 
 from __future__ import annotations
@@ -55,7 +57,10 @@ VIDEO_FRAMES = 400
 AUDIO_BLOCKS = 800
 AUDIO_SAMPLES_PER_EAR = 384_000
 SAMPLES_PER_FRAME = 960
-EXPECTED_PEAK_PRESSURE_PA = 0.7284
+EXPECTED_PEAK_PRESSURE_PA = 0.8566
+EXPECTED_PUBLIC_AUDIO_SHA256 = (
+    "d51749cec3e3e76739f8be7077dea40cf153bcf11a213d6cd9bd8ddf4ef1229b"
+)
 
 CAMERA_LOOKAT = (0.55, 0.0, 0.55)
 CAMERA_DISTANCE = 2.2
@@ -79,6 +84,14 @@ EXPECTED_SCRAPE_WINDOWS = {
     "scrape:6:11": (2.215, 3.405),
     "scrape:6:13": (4.415, 5.605),
 }
+EXPECTED_BALL_IMPACTS = (
+    (1.290, "impact_wood_rubber_2", 0.464927093468),
+    (1.460, "impact_wood_rubber_0", 0.035354958453),
+    (1.510, "impact_wood_rubber_2", 0.002989637751),
+    (1.535, "impact_wood_rubber_2", 0.000500020446),
+)
+IMPACT_TIME_TOLERANCE_SECONDS = 1e-12
+IMPACT_ENERGY_TOLERANCE_J = 5e-13
 
 POSE_JOINTS = {
     "head_swivel": "robot:head_swivel",
@@ -687,7 +700,10 @@ def export_demo(
             {"start_s": 4.4, "stop_s": 5.6, "phase": "cylinder_drag", "speed_m_s": 0.30},
             {"start_s": 5.6, "stop_s": 8.0, "phase": "cylinder_release_and_room_tail"},
         ],
-        "behavior_label": "scripted_pose_and_constrained_validation_fixtures",
+        "behavior_label": (
+            "kinematically_constrained_external_camera_audition_diagnostic"
+        ),
+        "contact_physics": "current production scene contact pairs",
     }
     environment = BlightWorldEnv(
         width=64,
@@ -849,6 +865,8 @@ def export_demo(
                     "demo peak pressure changed: "
                     f"expected {EXPECTED_PEAK_PRESSURE_PA}, got {peak_pressure_pa}"
                 )
+            if peak_pressure_pa >= 1.0:
+                raise AssertionError("1 Pa = 1 FS diagnostic media would clip")
 
             scrape_windows: dict[str, Any] = {}
             for stream_id, expected_window in EXPECTED_SCRAPE_WINDOWS.items():
@@ -865,19 +883,48 @@ def export_demo(
                     "last_active_time_s": observed[1],
                     "active_substeps": len(times),
                 }
-            primary_ball_events = [
+            ball_events = [
                 event
                 for event in events
-                if event["accepted"]
-                and event["clip_id"].startswith("impact_wood_rubber_")
+                if event["clip_id"].startswith("impact_wood_rubber_")
             ]
-            if not primary_ball_events or not np.isclose(
-                primary_ball_events[0]["simulation_time_s"],
-                1.290,
-                rtol=0,
-                atol=0.005,
+            if len(ball_events) != len(EXPECTED_BALL_IMPACTS) or not all(
+                event["accepted"] for event in ball_events
             ):
-                raise AssertionError("ball/table impact marker departed from 1.290 s")
+                raise AssertionError(
+                    "accepted ball/table impact count changed: "
+                    f"{[(event['clip_id'], event['accepted']) for event in ball_events]}"
+                )
+            for event, (expected_time, expected_clip, expected_energy) in zip(
+                ball_events,
+                EXPECTED_BALL_IMPACTS,
+                strict=True,
+            ):
+                if event["clip_id"] != expected_clip:
+                    raise AssertionError(
+                        "ball/table impact clip changed: "
+                        f"expected {expected_clip}, got {event['clip_id']}"
+                    )
+                if not np.isclose(
+                    event["simulation_time_s"],
+                    expected_time,
+                    rtol=0,
+                    atol=IMPACT_TIME_TOLERANCE_SECONDS,
+                ):
+                    raise AssertionError(
+                        "ball/table impact time changed: "
+                        f"expected {expected_time}, got {event['simulation_time_s']}"
+                    )
+                if not np.isclose(
+                    event["impact_energy_j"],
+                    expected_energy,
+                    rtol=0,
+                    atol=IMPACT_ENERGY_TOLERANCE_J,
+                ):
+                    raise AssertionError(
+                        "ball/table impact energy changed: "
+                        f"expected {expected_energy}, got {event['impact_energy_j']}"
+                    )
 
             pressure_little_endian = np.ascontiguousarray(
                 pressure,
@@ -890,6 +937,12 @@ def export_demo(
             raw_audio_channels_first_sha256 = sha256(
                 pressure_little_endian.tobytes(order="C")
             ).hexdigest()
+            if raw_audio_channels_first_sha256 != EXPECTED_PUBLIC_AUDIO_SHA256:
+                raise AssertionError(
+                    "public audition waveform changed: "
+                    f"expected {EXPECTED_PUBLIC_AUDIO_SHA256}, "
+                    f"got {raw_audio_channels_first_sha256}"
+                )
             raw_audio_interleaved_sha256 = sha256(
                 pressure_interleaved.tobytes(order="C")
             ).hexdigest()
@@ -940,10 +993,12 @@ def export_demo(
             raise AssertionError("left/right scrape ILD signs did not reverse")
         manifest = {
             "schema_version": 1,
-            "title": "BlightWorld scripted audiovisual audition demonstration",
+            "title": "BlightWorld external-camera audition diagnostic",
             "description": (
-                "Kinematically constrained validation fixtures with a scripted "
-                "head/right-arm pose; not autonomous or learned behavior."
+                "Kinematically constrained validation fixtures, an external "
+                "camera, a scripted head/right-arm pose, and current production "
+                "contact physics. This is an audition diagnostic, not autonomous, "
+                "learned, or naturally driven physical behavior."
             ),
             "listening_note": "Headphones recommended for binaural playback.",
             "media_pressure_mapping": {

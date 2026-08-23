@@ -21,6 +21,7 @@ from numpy.typing import NDArray
 _TEXTURE_PLACEHOLDER = "{{MIMO_TEXTURE_DIR}}"
 _META_PLACEHOLDER = "{{MIMO_META_XML}}"
 _MODEL_PLACEHOLDER = "{{MIMO_MODEL_XML}}"
+_SCENE_EXTENSION_PLACEHOLDER = "{{SCENE_EXTENSION_XML}}"
 
 
 def _xml_path(path: Path) -> str:
@@ -44,6 +45,8 @@ class BlightWorldEnv(MIMoEnv):
     The MuJoCo scene is materialized in an instance-owned temporary directory.
     Installed MIMo assets are referenced read-only and are never rewritten.
     """
+
+    _scene_extension_xml = ""
 
     def __init__(
         self,
@@ -80,6 +83,7 @@ class BlightWorldEnv(MIMoEnv):
             _TEXTURE_PLACEHOLDER: _xml_path(upstream_assets),
             _META_PLACEHOLDER: _xml_path(meta_xml),
             _MODEL_PLACEHOLDER: _xml_path(model_xml),
+            _SCENE_EXTENSION_PLACEHOLDER: self._scene_extension_xml,
         }
         scene_xml = template
         for placeholder, value in replacements.items():

@@ -97,6 +97,56 @@ def test_scene_contains_only_required_named_structure(environment: BlightWorldEn
         assert environment.model.geom_conaffinity[geom_id] != 0
 
 
+def test_table_object_contact_pairs_compile_with_local_parameters(
+    environment: BlightWorldEnv,
+) -> None:
+    """Only each object/table pair receives its selected contact physics."""
+
+    expected = {
+        frozenset(("ball_geom", "table_top")): {
+            "condim": 3,
+            "solref": np.asarray((0.015, 0.40)),
+            "friction": np.asarray((0.55, 0.55, 0.01, 0.002, 0.002)),
+        },
+        frozenset(("block_geom", "table_top")): {
+            "condim": 3,
+            "solref": np.asarray((0.02, 1.0)),
+            "friction": np.asarray((0.30, 0.30, 0.02, 0.001, 0.001)),
+        },
+        frozenset(("cylinder_geom", "table_top")): {
+            "condim": 6,
+            "solref": np.asarray((0.02, 1.0)),
+            "friction": np.asarray((0.50, 0.50, 0.02, 0.025, 0.025)),
+        },
+    }
+    observed: dict[frozenset[str], dict[str, int | np.ndarray]] = {}
+    for pair_id in range(environment.model.npair):
+        geom_names = frozenset(
+            (
+                environment.model.geom(int(environment.model.pair_geom1[pair_id])).name,
+                environment.model.geom(int(environment.model.pair_geom2[pair_id])).name,
+            )
+        )
+        if geom_names in expected:
+            observed[geom_names] = {
+                "condim": int(environment.model.pair_dim[pair_id]),
+                "solref": environment.model.pair_solref[pair_id].copy(),
+                "friction": environment.model.pair_friction[pair_id].copy(),
+            }
+
+    assert observed.keys() == expected.keys()
+    for geom_names, parameters in expected.items():
+        assert observed[geom_names]["condim"] == parameters["condim"]
+        np.testing.assert_array_equal(
+            observed[geom_names]["solref"],
+            parameters["solref"],
+        )
+        np.testing.assert_array_equal(
+            observed[geom_names]["friction"],
+            parameters["friction"],
+        )
+
+
 def test_scene_objects_have_binocular_field_of_view_margin(
     environment: BlightWorldEnv,
 ) -> None:
