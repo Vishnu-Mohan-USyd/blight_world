@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gc
 import hashlib
 from importlib import metadata
 from pathlib import Path
@@ -184,3 +185,52 @@ def test_action_and_single_step_contract(environment: BlightWorldEnv) -> None:
     for key in ("eye_left", "eye_right"):
         assert observation[key].shape == (EYE_HEIGHT, EYE_WIDTH, 3)
         assert observation[key].dtype == np.uint8
+
+
+def test_closed_environment_finalizer_cannot_blacken_new_renderer() -> None:
+    """Late collection of an old vision cycle cannot free a new GL context."""
+
+    gc.collect()
+    collection_was_enabled = gc.isenabled()
+    gc.disable()
+    first: BlightWorldEnv | None = BlightWorldEnv(width=32, height=24)
+    second: BlightWorldEnv | None = None
+    try:
+        first_observation, _ = first.reset(seed=79)
+        for eye_name in ("eye_left", "eye_right"):
+            assert np.any(first_observation[eye_name])
+        assert not np.array_equal(
+            first_observation["eye_left"],
+            first_observation["eye_right"],
+        )
+        first.close()
+        del first_observation
+        first = None
+
+        second = BlightWorldEnv(width=32, height=24)
+        before_collection, _ = second.reset(seed=83)
+        before_rgb = {
+            eye_name: before_collection[eye_name].copy()
+            for eye_name in ("eye_left", "eye_right")
+        }
+        for eye in before_rgb.values():
+            assert np.any(eye)
+        assert not np.array_equal(before_rgb["eye_left"], before_rgb["eye_right"])
+
+        gc.collect()
+        after_collection, _ = second.reset(seed=83)
+        for eye_name, expected in before_rgb.items():
+            assert np.any(after_collection[eye_name])
+            np.testing.assert_array_equal(after_collection[eye_name], expected)
+        assert not np.array_equal(
+            after_collection["eye_left"],
+            after_collection["eye_right"],
+        )
+    finally:
+        if first is not None:
+            first.close()
+        if second is not None:
+            second.close()
+            second.close()
+        if collection_was_enabled:
+            gc.enable()

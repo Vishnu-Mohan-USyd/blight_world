@@ -60,6 +60,7 @@ class BlightWorldEnv(MIMoEnv):
 
         self._audition_config = audition
         self.audition: MIMoAudition | None = None
+        self._closed = False
 
         upstream_assets = Path(mimoEnv.__file__).resolve().parent / "assets"
         meta_xml = upstream_assets / "mimo" / "MIMo_metav2.xml"
@@ -273,7 +274,18 @@ class BlightWorldEnv(MIMoEnv):
         """Close MIMo renderers and remove the instance-owned scene directory."""
 
         try:
-            super().close()
+            if not self._closed:
+                try:
+                    renderer = getattr(self, "mujoco_renderer", None)
+                    if renderer is not None:
+                        for viewer in tuple(renderer._viewers.values()):
+                            viewer.make_context_current()
+                            viewer.con.free()
+                finally:
+                    try:
+                        super().close()
+                    finally:
+                        self._closed = True
         finally:
             scene_directory = self._scene_directory
             if scene_directory is not None:
