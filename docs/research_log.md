@@ -95,6 +95,50 @@ excitation, not recordings of calibrated physical specimens or a validated
 material-identification dataset. Asset provenance and regeneration details are
 stored beside the WAV manifest.
 
+## Persistent scrape sound
+
+Scrape generation is opt-in through `ContinuousSoundConfig`. On each 5 ms
+physics substep, solved contact points are aggregated by unordered geom pair.
+The tracker transforms tangential contact force into world coordinates and
+uses the engineering friction-power proxy
+
+`P_friction = ||F_tangential|| ||v_tangential||`.
+
+A stream turns on after two consecutive substeps at or above 0.10 N normal load
+and 0.02 m/s tangential speed. It turns off below 0.05 N or 0.01 m/s, with a
+one-substep contact-dropout bridge. These thresholds and the hysteresis are
+engineering defaults, not measurements of a particular material or human
+interaction. Contact controls are interpolated within each audio block and
+friction power is smoothed with a 10 ms time constant. The target source level
+is
+
+`p_rms = min(0.05 Pa, 0.005 Pa sqrt(P_ema / 0.10 W))` at 1 m.
+
+Each stable geom-pair stream owns a BLAKE2-derived random generator and
+persistent material-dependent roughness/filter state. A 10 ms attack and 30 ms
+release bound starts and stops. This produces deterministic, interaction-varying
+excitation while preserving stream identity across motion and direction
+reversal. It is a practical stochastic/filter approximation: it does not claim
+to reproduce the full modal surface response or an elasto-plastic friction law.
+
+The design is informed by two primary physical-sound-synthesis works:
+
+- van den Doel, Kry, and Pai couple rigid-body simulation to event and
+  continuous contact sound in *FoleyAutomatic: Physically-based Sound Effects
+  for Interactive Simulation and Animation*,
+  [SIGGRAPH 2001, DOI 10.1145/383259.383322](https://doi.org/10.1145/383259.383322).
+- Avanzini, Serafin, and Rocchesso model friction-induced sound from interacting
+  rigid bodies in
+  [IEEE Transactions on Speech and Audio Processing 13(5), 1073–1081 (2005),
+  DOI 10.1109/TSA.2005.852984](https://doi.org/10.1109/TSA.2005.852984).
+
+The current implementation adopts their physical-control principle but uses a
+bounded roughness/filter source rather than reproducing either paper's complete
+synthesis model. Rolling, clothing, and air-flow sound are not implemented.
+The measured 24-cell constrained-contact matrix, transitions, binaural mirrors,
+and voice-capacity checks are recorded in
+[`audition_scrape_validation_profile.md`](audition_scrape_validation_profile.md).
+
 ## Reproducibility and asset identity
 
 - SADIE II v2.2 H10 download archive SHA-256:

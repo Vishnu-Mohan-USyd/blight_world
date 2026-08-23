@@ -60,9 +60,14 @@ from blight_world import (
     AudioSourceSpec,
     BlightWorldEnv,
     BodyAttachment,
+    ContinuousSoundConfig,
 )
 
-env = BlightWorldEnv(audition=AuditionConfig.quality_48k())
+env = BlightWorldEnv(
+    audition=AuditionConfig.quality_48k(
+        continuous=ContinuousSoundConfig(),
+    )
+)
 observation, info = env.reset(seed=0)
 assert env.audition is not None
 env.audition.register_source(
@@ -73,9 +78,17 @@ observation, reward, terminated, truncated, info = env.step(
     np.zeros(env.action_space.shape, dtype=np.float32)
 )
 pressure_pa = observation["audition"]
+scrape_diagnostics = env.audition.scrape_diagnostics
 env.close()
 PY
 ```
+
+`ContinuousSoundConfig()` enables persistent physics-driven scrape audio for
+solved sliding contacts. It uses a separate four-stream pool, so it does not
+reserve any of the eight clip/impact voices. The immutable diagnostics are
+available only on `env.audition.scrape_diagnostics`; contact identities and
+controls are never added to observations or `info`. Rolling, clothing, and air
+sounds are outside the current scope.
 
 The renderer uses the paired adult SADIE II H10 HRIR measurements, virtual
 ears rigidly attached to MIMo's head, propagation delay and distance loss,
@@ -90,4 +103,21 @@ positions are never inserted into observations or `info`.
 The reusable interfaces are available directly from `mimo_audition`; the
 common configuration and source types are also re-exported from `blight_world`.
 See [`docs/research_log.md`](docs/research_log.md) for provenance, equations,
-scientific grounding, and declared approximations.
+scientific grounding, and declared approximations. Reproduce the measured
+live-contact results with `tools/profile_audition_scrape.py`; the generated
+report is [`docs/audition_scrape_validation_profile.md`](docs/audition_scrape_validation_profile.md).
+
+The bounded-state timing run is deliberately outside CI:
+
+```bash
+MUJOCO_GL=egl .venv/bin/python tools/benchmark_audition_streaming.py \
+  --duration-24k 600 --duration-48k 60 --warmup 2 \
+  --json-output /tmp/blight-audition-benchmark.json
+MUJOCO_GL=egl .venv/bin/python tools/profile_audition_scrape.py \
+  --benchmark-json /tmp/blight-audition-benchmark.json \
+  --json-output /tmp/blight-audition-scrape-profile.json \
+  --markdown-output /tmp/blight-audition-scrape-profile.md
+```
+
+The reference Python renderer is not advertised as real-time; use the reported
+p99 substep latency to evaluate it on the target machine.
