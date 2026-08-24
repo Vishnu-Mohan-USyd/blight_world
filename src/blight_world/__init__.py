@@ -38,6 +38,15 @@ from blight_world.supported_pick_place import (
     SupportedPickPlaceEnv,
     SupportedPickPlaceState,
 )
+from blight_world.supported_bimanual import (
+    BimanualClampControlDiagnostics,
+    BimanualClampControllerState,
+    BimanualClampPhase,
+    FoamBlockContactClassifier,
+    FoamBlockContacts,
+    SupportedBimanualFoamBlockClampController,
+    SupportedBimanualFoamBlockEnv,
+)
 from mimo_audition import (
     AuditionConfig,
     AuditionSpec,
@@ -56,6 +65,9 @@ __all__ = [
     "AudioSourceSpec",
     "BlightWorldEnv",
     "BodyAttachment",
+    "BimanualClampControlDiagnostics",
+    "BimanualClampControllerState",
+    "BimanualClampPhase",
     "BellyCrawlControlDiagnostics",
     "BellyCrawlControllerState",
     "BellyCrawlPhase",
@@ -63,6 +75,8 @@ __all__ = [
     "ContinuousSoundConfig",
     "MotorChannel",
     "MotorControllerState",
+    "FoamBlockContactClassifier",
+    "FoamBlockContacts",
     "RightHandSpherePushController",
     "RightHandSpherePickPlaceController",
     "RIGHT_ARM_ACTUATOR_NAMES",
@@ -78,6 +92,8 @@ __all__ = [
     "SupportedPushControlDiagnostics",
     "SupportedPushControllerState",
     "SupportedPushEnv",
+    "SupportedBimanualFoamBlockClampController",
+    "SupportedBimanualFoamBlockEnv",
     "UnsupportedStaticSupportController",
     "UnsupportedBellyCrawlController",
     "UnsupportedStaticSupportEnv",
