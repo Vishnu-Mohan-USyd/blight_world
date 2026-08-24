@@ -1,0 +1,93 @@
+<mujoco model="blight_world">
+  <compiler angle="degree" coordinate="local" texturedir="{{MIMO_TEXTURE_DIR}}"/>
+  <option timestep="0.005" gravity="0 0 -9.81"/>
+  <size njmax="1000" nconmax="200"/>
+
+  <visual>
+    <global offwidth="640" offheight="480"/>
+    <quality shadowsize="2048"/>
+  </visual>
+
+  <default>
+    <geom condim="3" friction="0.9 0.1 0.1" contype="1" conaffinity="1"/>
+  </default>
+
+  <asset>
+    <texture name="floor_texture" type="2d" builtin="checker"
+             rgb1="0.22 0.24 0.27" rgb2="0.52 0.55 0.58"
+             width="256" height="256"/>
+    <material name="floor_material" texture="floor_texture" texrepeat="6 6"
+              reflectance="0.05"/>
+    <material name="wall_material" rgba="0.78 0.80 0.82 1"/>
+    <material name="ceiling_material" rgba="0.90 0.91 0.92 1"/>
+    <material name="table_material" rgba="0.40 0.22 0.10 1"/>
+    <material name="ball_material" rgba="0.90 0.12 0.10 1"/>
+    <material name="block_material" rgba="0.10 0.28 0.92 1"/>
+    <material name="cylinder_material" rgba="0.12 0.78 0.28 1"/>
+  </asset>
+
+  <include file="{{MIMO_META_XML}}"/>
+
+  <contact>
+    <pair geom1="ball_geom" geom2="table_top" condim="3"
+          solref=".015 .40" friction=".55 .55 .01 .002 .002"/>
+    <pair geom1="block_geom" geom2="table_top" condim="3"
+          friction=".30 .30 .02 .001 .001"/>
+    <pair geom1="cylinder_geom" geom2="table_top" condim="6"
+          friction=".50 .50 .02 .025 .025"/>
+  </contact>
+
+  <worldbody>
+    <light name="key_light" pos="0.4 -1.2 2.2" dir="0.3 0.2 -1"
+           directional="true" diffuse="0.9 0.9 0.9"/>
+    <light name="fill_light" pos="1.8 1.2 1.8" dir="-0.4 -0.2 -1"
+           directional="true" diffuse="0.45 0.45 0.45"/>
+
+    <geom name="floor" type="plane" pos="0 0 0" size="2.5 2.5 0.1"
+          material="floor_material"/>
+    <geom name="ceiling" type="box" pos="0 0 2.5" size="2.5 2.5 0.05"
+          material="ceiling_material"/>
+    <geom name="wall_front" type="box" pos="2.5 0 1.25" size="0.05 2.5 1.25"
+          material="wall_material"/>
+    <geom name="wall_back" type="box" pos="-2.5 0 1.25" size="0.05 2.5 1.25"
+          material="wall_material"/>
+    <geom name="wall_left" type="box" pos="0 2.5 1.25" size="2.5 0.05 1.25"
+          material="wall_material"/>
+    <geom name="wall_right" type="box" pos="0 -2.5 1.25" size="2.5 0.05 1.25"
+          material="wall_material"/>
+
+    <body name="table" pos="-1.800000 1.800000 0.000000">
+      <geom name="table_top" type="box" pos="0 0 0.55" size="0.45 0.55 0.05"
+            material="table_material"/>
+      <geom name="table_leg_front_left" type="box" pos="0.32 0.42 0.275"
+            size="0.04 0.04 0.275" material="table_material"/>
+      <geom name="table_leg_front_right" type="box" pos="0.32 -0.42 0.275"
+            size="0.04 0.04 0.275" material="table_material"/>
+      <geom name="table_leg_back_left" type="box" pos="-0.32 0.42 0.275"
+            size="0.04 0.04 0.275" material="table_material"/>
+      <geom name="table_leg_back_right" type="box" pos="-0.32 -0.42 0.275"
+            size="0.04 0.04 0.275" material="table_material"/>
+    </body>
+
+    <body name="block" pos="2.200000 2.200000 2.200000">
+      <freejoint name="block_joint"/>
+      <geom name="block_geom" type="box" size="0.1 0.1 0.1"
+            mass="0.15" material="block_material" contype="0" conaffinity="0"/>
+    </body>
+    <body name="ball" pos="0.540000 0.200000 0.025000">
+      <freejoint name="ball_joint"/>
+      <geom name="ball_geom" type="sphere" size="0.025000" mass="0.150000" friction="1.100000 0.200000 0.100000" material="ball_material"/>
+    </body>
+    <body name="cylinder" pos="2.200000 2.200000 2.200000">
+      <freejoint name="cylinder_joint"/>
+      <geom name="cylinder_geom" type="cylinder" size="0.1 0.1"
+            mass="0.14" material="cylinder_material" contype="0" conaffinity="0"/>
+    </body>
+
+    <body name="mimo_location" pos="0 0 0.4" euler="0 0 0">
+      <freejoint name="mimo_orientation"/>
+      <include file="{{MIMO_MODEL_XML}}"/>
+    </body>
+  </worldbody>
+  {{SCENE_EXTENSION_XML}}
+</mujoco>
