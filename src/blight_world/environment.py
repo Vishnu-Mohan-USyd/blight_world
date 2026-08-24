@@ -13,6 +13,7 @@ import mujoco
 import numpy as np
 from gymnasium import spaces, utils
 from gymnasium.envs.mujoco import MujocoEnv
+from mimoActuation.actuation import ActuationModel, SpringDamperModel
 from mimoEnv.envs.mimo_env import EMOTES, MIMoEnv
 from mimo_audition import AuditionConfig, MIMoAudition
 from numpy.typing import NDArray
@@ -39,6 +40,18 @@ class BlightWorldEnv(MIMoEnv):
         Width in pixels of each eye image. Must be a positive integer.
     height:
         Height in pixels of each eye image. Must be a positive integer.
+    proprio_params:
+        Optional MIMo proprioception configuration. ``None`` preserves this
+        environment's minimal joint-position-only default.
+    touch_params, vestibular_params:
+        Optional upstream MIMo modality configurations. ``None`` keeps each
+        modality disabled as in the original environment.
+    actuation_model:
+        Upstream MIMo actuation-model class. The default remains the pinned
+        spring-damper torque model.
+    motor_delay:
+        Non-negative number of environment steps used by MIMo's motor-delay
+        queue. The default remains zero.
 
     Notes
     -----
@@ -53,6 +66,11 @@ class BlightWorldEnv(MIMoEnv):
         width: int = 96,
         height: int = 96,
         audition: AuditionConfig | None = None,
+        proprio_params: dict[str, Any] | None = None,
+        touch_params: dict[str, Any] | None = None,
+        vestibular_params: dict[str, Any] | None = None,
+        actuation_model: type[ActuationModel] = SpringDamperModel,
+        motor_delay: int = 0,
     ) -> None:
         if isinstance(width, bool) or not isinstance(width, int) or width <= 0:
             raise ValueError("width must be a positive integer")
@@ -60,6 +78,24 @@ class BlightWorldEnv(MIMoEnv):
             raise ValueError("height must be a positive integer")
         if audition is not None and not isinstance(audition, AuditionConfig):
             raise TypeError("audition must be an AuditionConfig or None")
+        for name, parameters in (
+            ("proprio_params", proprio_params),
+            ("touch_params", touch_params),
+            ("vestibular_params", vestibular_params),
+        ):
+            if parameters is not None and not isinstance(parameters, dict):
+                raise TypeError(f"{name} must be a dict or None")
+        if (
+            not isinstance(actuation_model, type)
+            or not issubclass(actuation_model, ActuationModel)
+        ):
+            raise TypeError("actuation_model must be an ActuationModel class")
+        if (
+            isinstance(motor_delay, bool)
+            or not isinstance(motor_delay, int)
+            or motor_delay < 0
+        ):
+            raise ValueError("motor_delay must be a non-negative integer")
 
         self._audition_config = audition
         self.audition: MIMoAudition | None = None
@@ -114,10 +150,16 @@ class BlightWorldEnv(MIMoEnv):
                 width=width,
                 height=height,
                 age=None,
-                proprio_params={"components": []},
-                touch_params=None,
+                proprio_params=(
+                    {"components": []}
+                    if proprio_params is None
+                    else proprio_params
+                ),
+                touch_params=touch_params,
                 vision_params=vision_params,
-                vestibular_params=None,
+                vestibular_params=vestibular_params,
+                actuation_model=actuation_model,
+                motor_delay=motor_delay,
                 goals_in_observation=False,
                 done_active=False,
                 render_mode=None,
@@ -126,7 +168,17 @@ class BlightWorldEnv(MIMoEnv):
             self._scene_directory.cleanup()
             self._scene_directory = None
             raise
-        utils.EzPickle.__init__(self, width=width, height=height, audition=audition)
+        utils.EzPickle.__init__(
+            self,
+            width=width,
+            height=height,
+            audition=audition,
+            proprio_params=proprio_params,
+            touch_params=touch_params,
+            vestibular_params=vestibular_params,
+            actuation_model=actuation_model,
+            motor_delay=motor_delay,
+        )
 
     @property
     def scene_path(self) -> Path:

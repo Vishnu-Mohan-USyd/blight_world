@@ -23,3 +23,25 @@
   demos must drive objects through MuJoCo forces, actuators, constraints, and
   contacts, and must validate velocity, rebound, deceleration, and bounds from
   recorded trajectories.
+- Distinguish short regression fixtures from user-facing showcase media. When
+  the user wants to judge visual, auditory, and physical quality, provide
+  enough duration and varied representative interactions to make that judgment
+  possible, while declaring trial cuts and unsupported capabilities honestly.
+- Treat straightforward extensions as extensions: reuse validated components
+  and parameters, vary only what the request needs, and avoid reopening the
+  architecture or launching broad research when a small composition change is
+  sufficient.
+- Do not substitute repeated passive object trials when the user asks to see
+  embodied behavior. Separate simulator/body capability from controller
+  capability explicitly: walking, crouching, grasping, and throwing require a
+  motor controller or policy, and must never be implied by teleports, hidden
+  clamps, or a showcase of unrelated falling objects.
+- Never equate one narrow regression fixture with extensive system testing.
+  Derive a coverage matrix from the user's requested behaviors and modalities,
+  validate each included primitive independently, and make showcase media long
+  and varied enough to expose failures rather than cherry-picking one event.
+- When the user explicitly requires persistence until results, do not turn a
+  difficult but authorized scope expansion into a permission question or go
+  idle. Make the narrowest reasonable assumptions, keep executing through the
+  specialist diagnose/implement/validate loop, and surface only genuine
+  external blockers after exhausting in-scope alternatives.
