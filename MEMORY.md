@@ -45,3 +45,7 @@
   idle. Make the narrowest reasonable assumptions, keep executing through the
   specialist diagnose/implement/validate loop, and surface only genuine
   external blockers after exhausting in-scope alternatives.
+- Never ask whether to begin or continue the next already-authorized phase.
+  Proceed autonomously through implementation, validation, checkpointing, and
+  artifact production; ask only when a genuinely new authority or material
+  user choice is required.
