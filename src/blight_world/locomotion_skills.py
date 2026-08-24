@@ -1,8 +1,9 @@
-"""Unsupported static-support primitives for MIMo.
+"""Unsupported open-loop support and belly-crawl primitives for MIMo.
 
-The milestone in this module is a staged, open-loop torque posture that keeps
-MIMo statically supported by the floor without a root weld.  It is explicitly
-not locomotion, propulsion, perturbation recovery, or a learned controller.
+The static milestone is a staged torque posture that keeps MIMo supported by
+the floor without a root weld.  The crawl milestone layers a scripted
+actuator-only belly/army crawl on that posture.  Neither is learned, adaptive,
+an all-fours gait, or a perturbation-recovery controller.
 """
 
 from __future__ import annotations
@@ -36,6 +37,19 @@ UNSUPPORTED_ROOT_QPOS = (
 )
 ACTION_RAMP_SECONDS = 0.01
 
+BELLY_TRANSITION_START_SECONDS = 4.0
+BELLY_TRANSITION_STOP_SECONDS = 6.0
+BELLY_SETTLE_STOP_SECONDS = 18.0
+BELLY_CRAWL_STOP_SECONDS = 37.8
+BELLY_TRIAL_STOP_SECONDS = 41.8
+BELLY_LIMB_PHASE_SECONDS = 1.35
+BELLY_RELOAD_SECONDS = 0.30
+BELLY_BUMP_RISE_SECONDS = 0.3375
+BELLY_BUMP_PLATEAU_STOP_SECONDS = 1.0125
+BELLY_CYCLE_SECONDS = 2.0 * (BELLY_LIMB_PHASE_SECONDS + BELLY_RELOAD_SECONDS)
+BELLY_FIRST_SIDE = ("right", "left", "right", "left", "left", "left")
+BELLY_STANCE_FRONT = (0.29, 0.34, 0.34, 0.34, 0.34, 0.34)
+
 BILATERAL_STATIC_ACTIONS = {
     "shoulder_horizontal": 0.5495666434717998,
     "shoulder_abduction": 0.4060872441575624,
@@ -49,6 +63,22 @@ BILATERAL_STATIC_ACTIONS = {
 CENTRAL_STATIC_ACTIONS = {
     "hip_bend": -0.11562250893837525,
     "head_tilt": -0.5,
+}
+BELLY_ACTION_DELTAS = {
+    "shoulder_horizontal": -0.9,
+    "elbow": 0.8,
+    "knee": -0.4,
+    "hip_flex": 0.2,
+}
+BELLY_MOVING_SIDE_DELTAS = {
+    "shoulder_horizontal": -1.2,
+    "elbow": 0.985,
+    "hip_flex": 0.146,
+}
+BELLY_OPPOSITE_SIDE_DELTAS = {
+    "knee": -0.22,
+    "hip_flex": 0.042,
+    "foot_flexion": -0.25,
 }
 
 
@@ -172,6 +202,302 @@ class UnsupportedStaticSupportController:
             StaticSupportControllerState(motor_state=motor_state),
             diagnostics,
         )
+
+
+class BellyCrawlPhase(str, Enum):
+    """Named segment of the scripted unsupported belly-crawl waveform."""
+
+    STATIC_SUPPORT = "static_support"
+    TRANSITION_TO_BELLY = "transition_to_belly"
+    BELLY_SETTLE = "belly_settle"
+    LIMB_PHASE = "limb_phase"
+    RELOAD = "reload"
+    BELLY_TAIL = "belly_tail"
+
+
+@dataclass(frozen=True, slots=True)
+class BellyCrawlControllerState:
+    """Immutable sparse-composer state for the scripted crawl primitive."""
+
+    motor_state: MotorControllerState
+
+
+@dataclass(frozen=True, slots=True)
+class BellyCrawlControlDiagnostics:
+    """Immutable command evidence for one public environment step."""
+
+    time_seconds: float
+    phase: BellyCrawlPhase
+    cycle_index: int | None
+    moving_side: str | None
+    bump_fraction: float
+    minimum_action_bound_margin: float
+
+
+class UnsupportedBellyCrawlController:
+    """Scripted actuator-only unsupported belly/army crawl.
+
+    The controller is deterministic open-loop playback of normalized
+    SpringDamper actions.  It is not a learned policy, feedback locomotion
+    controller, or an all-fours gait.  The optional rest-control mode follows
+    the same static-to-belly transition and duration but omits crawl phases.
+    """
+
+    __slots__ = (
+        "_channels",
+        "_composer",
+        "_cycles_enabled",
+        "_model",
+        "_static_targets",
+    )
+
+    def __init__(
+        self,
+        environment: UnsupportedStaticSupportEnv,
+        *,
+        cycles_enabled: bool = True,
+    ) -> None:
+        self._model = environment.model
+        self._cycles_enabled = bool(cycles_enabled)
+        static_targets: dict[str, float] = {}
+        for side in ("right", "left"):
+            for suffix, value in BILATERAL_STATIC_ACTIONS.items():
+                static_targets[f"act:{side}_{suffix}"] = float(np.float32(value))
+        for suffix, value in CENTRAL_STATIC_ACTIONS.items():
+            static_targets[f"act:{suffix}"] = float(np.float32(value))
+        self._static_targets = static_targets
+        self._channels = {
+            name: resolve_motor_channel(environment, name)
+            for name in static_targets
+        }
+        self._composer = SparseActionComposer(resolve_motor_channels(environment))
+
+    @property
+    def controlled_actuator_names(self) -> tuple[str, ...]:
+        """Return the exact name-resolved actuators owned by this primitive."""
+
+        return tuple(self._channels)
+
+    def reset(self) -> BellyCrawlControllerState:
+        """Return a deterministic zero-action composer state."""
+
+        return BellyCrawlControllerState(motor_state=self._composer.reset())
+
+    def compose(
+        self,
+        environment: UnsupportedStaticSupportEnv,
+        state: BellyCrawlControllerState,
+        *,
+        time_seconds: float | None = None,
+    ) -> tuple[
+        NDArray[np.float32],
+        BellyCrawlControllerState,
+        BellyCrawlControlDiagnostics,
+    ]:
+        """Compose one bounded action without writing simulation state."""
+
+        if environment.model is not self._model:
+            raise ValueError("controller belongs to a different MuJoCo model")
+        time_value = (
+            float(state.motor_state.step_index * environment.dt)
+            if time_seconds is None
+            else float(time_seconds)
+        )
+        if not isfinite(time_value) or time_value < 0.0:
+            raise ValueError("time_seconds must be finite and non-negative")
+        targets, phase, cycle_index, moving_side, bump = self._targets_at_time(
+            time_value
+        )
+        commands = {
+            self._channels[name]: value for name, value in targets.items()
+        }
+        action, motor_state = self._composer.compose(
+            {"unsupported_belly_crawl": commands}, state.motor_state
+        )
+        margins = (
+            min(
+                float(action[channel.action_index]) - channel.lower_bound,
+                channel.upper_bound - float(action[channel.action_index]),
+            )
+            for channel in self._composer.channels
+        )
+        return (
+            action,
+            BellyCrawlControllerState(motor_state=motor_state),
+            BellyCrawlControlDiagnostics(
+                time_seconds=time_value,
+                phase=phase,
+                cycle_index=cycle_index,
+                moving_side=moving_side,
+                bump_fraction=bump,
+                minimum_action_bound_margin=min(margins),
+            ),
+        )
+
+    def _targets_at_time(
+        self, time_seconds: float
+    ) -> tuple[dict[str, float], BellyCrawlPhase, int | None, str | None, float]:
+        static = self._static_targets
+        if time_seconds < BELLY_TRANSITION_START_SECONDS:
+            if time_seconds == 0.0:
+                return (
+                    {name: 0.0 for name in static},
+                    BellyCrawlPhase.STATIC_SUPPORT,
+                    None,
+                    None,
+                    0.0,
+                )
+            progress = float(
+                np.clip(time_seconds / ACTION_RAMP_SECONDS, 0.0, 1.0)
+            )
+            ramp = self._smoothstep(progress)
+            return (
+                {
+                    name: self._lerp_float32(0.0, value, ramp)
+                    for name, value in static.items()
+                },
+                BellyCrawlPhase.STATIC_SUPPORT,
+                None,
+                None,
+                0.0,
+            )
+
+        belly = self._belly_targets()
+        if time_seconds < BELLY_TRANSITION_STOP_SECONDS:
+            progress = (
+                time_seconds - BELLY_TRANSITION_START_SECONDS
+            ) / (
+                BELLY_TRANSITION_STOP_SECONDS - BELLY_TRANSITION_START_SECONDS
+            )
+            blend = self._smoothstep(progress)
+            return (
+                {
+                    name: self._lerp_float32(static[name], belly[name], blend)
+                    for name in static
+                },
+                BellyCrawlPhase.TRANSITION_TO_BELLY,
+                None,
+                None,
+                0.0,
+            )
+
+        if (
+            time_seconds < BELLY_SETTLE_STOP_SECONDS
+            or not self._cycles_enabled
+        ):
+            phase = (
+                BellyCrawlPhase.BELLY_SETTLE
+                if time_seconds < BELLY_SETTLE_STOP_SECONDS
+                else BellyCrawlPhase.BELLY_TAIL
+            )
+            return belly, phase, None, None, 0.0
+        if time_seconds >= BELLY_CRAWL_STOP_SECONDS:
+            return belly, BellyCrawlPhase.BELLY_TAIL, None, None, 0.0
+
+        cycle_position = time_seconds - BELLY_SETTLE_STOP_SECONDS
+        cycle_index = min(
+            int(cycle_position / BELLY_CYCLE_SECONDS),
+            len(BELLY_FIRST_SIDE) - 1,
+        )
+        local = cycle_position - cycle_index * BELLY_CYCLE_SECONDS
+        first_side = BELLY_FIRST_SIDE[cycle_index]
+        if local < BELLY_LIMB_PHASE_SECONDS:
+            moving_side = first_side
+            phase_time = local
+        elif local < BELLY_LIMB_PHASE_SECONDS + BELLY_RELOAD_SECONDS:
+            return belly, BellyCrawlPhase.RELOAD, cycle_index, None, 0.0
+        elif local < 2.0 * BELLY_LIMB_PHASE_SECONDS + BELLY_RELOAD_SECONDS:
+            moving_side = "left" if first_side == "right" else "right"
+            phase_time = local - BELLY_LIMB_PHASE_SECONDS - BELLY_RELOAD_SECONDS
+        else:
+            return belly, BellyCrawlPhase.RELOAD, cycle_index, None, 0.0
+
+        bump = self._limb_phase_bump(phase_time)
+        peak = self._phase_peak_targets(
+            moving_side=moving_side,
+            stance_front=BELLY_STANCE_FRONT[cycle_index],
+        )
+        return (
+            {
+                name: self._lerp_float32(belly[name], peak[name], bump)
+                for name in belly
+            },
+            BellyCrawlPhase.LIMB_PHASE,
+            cycle_index,
+            moving_side,
+            bump,
+        )
+
+    def _belly_targets(self) -> dict[str, float]:
+        targets = dict(self._static_targets)
+        for side in ("right", "left"):
+            for suffix, delta in BELLY_ACTION_DELTAS.items():
+                name = f"act:{side}_{suffix}"
+                targets[name] = self._endpoint_with_delta(targets[name], delta)
+        return targets
+
+    def _phase_peak_targets(
+        self, *, moving_side: str, stance_front: float
+    ) -> dict[str, float]:
+        targets = dict(self._static_targets)
+        opposite_side = "left" if moving_side == "right" else "right"
+        for suffix, delta in BELLY_MOVING_SIDE_DELTAS.items():
+            name = f"act:{moving_side}_{suffix}"
+            targets[name] = self._endpoint_with_delta(targets[name], delta)
+        for suffix, delta in BELLY_OPPOSITE_SIDE_DELTAS.items():
+            name = f"act:{opposite_side}_{suffix}"
+            targets[name] = self._endpoint_with_delta(targets[name], delta)
+        shoulder_name = f"act:{opposite_side}_shoulder_horizontal"
+        targets[shoulder_name] = self._endpoint_with_delta(
+            targets[shoulder_name], 0.4 * stance_front
+        )
+        elbow_name = f"act:{opposite_side}_elbow"
+        targets[elbow_name] = self._endpoint_with_delta(
+            targets[elbow_name], -0.5 * stance_front
+        )
+        return targets
+
+    @staticmethod
+    def _endpoint_with_delta(base: float, delta: float) -> float:
+        """Build one calibrated endpoint with exactly one float32 cast."""
+
+        return float(np.float32(float(np.float32(base)) + delta))
+
+    @staticmethod
+    def _lerp_float32(start: float, stop: float, fraction: float) -> float:
+        """Interpolate exactly as the calibrated float32 command generator."""
+
+        start32 = np.float32(start)
+        stop32 = np.float32(stop)
+        fraction32 = np.float32(fraction)
+        return float(
+            np.float32(
+                start32 + fraction32 * np.float32(stop32 - start32)
+            )
+        )
+
+    @staticmethod
+    def _smoothstep(value: float) -> float:
+        bounded = float(np.clip(value, 0.0, 1.0))
+        polynomial = 3.0 * bounded**2 - 2.0 * bounded**3
+        return float(np.clip(polynomial, 0.0, 1.0))
+
+    @classmethod
+    def _limb_phase_bump(cls, phase_time_seconds: float) -> float:
+        """Return the C1 rise/plateau/fall envelope for a 1.35 s phase."""
+
+        if phase_time_seconds <= 0.0 or phase_time_seconds >= BELLY_LIMB_PHASE_SECONDS:
+            return 0.0
+        if phase_time_seconds < BELLY_BUMP_RISE_SECONDS:
+            return cls._smoothstep(
+                phase_time_seconds / BELLY_BUMP_RISE_SECONDS
+            )
+        if phase_time_seconds <= BELLY_BUMP_PLATEAU_STOP_SECONDS:
+            return 1.0
+        fall_progress = (
+            phase_time_seconds - BELLY_BUMP_PLATEAU_STOP_SECONDS
+        ) / BELLY_BUMP_RISE_SECONDS
+        return 1.0 - cls._smoothstep(fall_progress)
 
 
 class SupportRegion(str, Enum):

@@ -19,11 +19,15 @@ from blight_world.motor_skills import (
     SupportedPushEnv,
 )
 from blight_world.locomotion_skills import (
+    BellyCrawlControlDiagnostics,
+    BellyCrawlControllerState,
+    BellyCrawlPhase,
     StaticSupportContactClassifier,
     StaticSupportContacts,
     StaticSupportControlDiagnostics,
     StaticSupportControllerState,
     UnsupportedStaticSupportController,
+    UnsupportedBellyCrawlController,
     UnsupportedStaticSupportEnv,
 )
 from blight_world.supported_pick_place import (
@@ -52,6 +56,9 @@ __all__ = [
     "AudioSourceSpec",
     "BlightWorldEnv",
     "BodyAttachment",
+    "BellyCrawlControlDiagnostics",
+    "BellyCrawlControllerState",
+    "BellyCrawlPhase",
     "ContinuousEmission",
     "ContinuousSoundConfig",
     "MotorChannel",
@@ -72,6 +79,7 @@ __all__ = [
     "SupportedPushControllerState",
     "SupportedPushEnv",
     "UnsupportedStaticSupportController",
+    "UnsupportedBellyCrawlController",
     "UnsupportedStaticSupportEnv",
     "SupportedPickPlaceConfig",
     "SupportedPickPlaceDiagnostics",
