@@ -53,3 +53,7 @@
   checklist and inspect those event frames early. Do not substitute hashes,
   infrastructure work, or a narrower validated behavior for a missing action;
   the artifact is unfinished until every requested action is plainly visible.
+- When correcting a showcase artifact, patch the visible failure directly and
+  regenerate it. Time-box diagnostics to representative frames/audio windows;
+  do not build new harnesses or launch broad validation unless the direct fix
+  actually exposes a deeper problem.
