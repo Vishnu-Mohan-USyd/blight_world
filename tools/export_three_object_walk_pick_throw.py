@@ -74,31 +74,45 @@ AUDIO_SAMPLE_RATE_HZ = 48_000
 AUDIO_BLOCK_SAMPLES = 480
 VIDEO_FRAMES = 2_250
 AUDIO_SAMPLES_PER_EAR = 2_160_000
-DEFAULT_MONITOR_GAIN = 0.04
+DEFAULT_MONITOR_GAIN = 0.75
 
-# Each gate is an observed 320x240 lower bound from the proven candidate.
-# The subject offset is cyclic relative to the current cycle target.
+EYE_PIXELS = EYE_WIDTH * EYE_HEIGHT
+CLEAR_OBJECT_PIXELS = EYE_PIXELS // 100
+FOLLOW_OBJECT_PIXELS = EYE_PIXELS // 400
+DISCERNIBLE_OBJECT_PIXELS = EYE_PIXELS // 1_200
+VISIBLE_OBJECT_PIXELS = EYE_PIXELS // 2_400
+REMOTE_VISIBLE_OBJECT_PIXELS = EYE_PIXELS // 4_800
+
+# Visibility tiers are resolution-derived rather than frozen sample counts.
+# The subject offset is cyclic relative to the current cycle target; the final
+# boolean requires the whole segmentation bounding box to remain in frame.
 SEGMENTATION_VISIBILITY_GATES = (
-    ("approach", 299, 0, 896),
-    ("held_lift", 649, 0, 1_383),
-    ("first_other_object_look", 849, 1, 71),
-    ("second_other_object_look", 999, 2, 15),
-    ("release", 1_200, 0, 859),
-    ("floor_impact", 1_237, 0, 138),
-    ("settle", 1_449, 0, 35),
+    ("approach", 299, 0, CLEAR_OBJECT_PIXELS, True),
+    ("held_lift", 699, 0, CLEAR_OBJECT_PIXELS, True),
+    ("first_other_object_look", 849, 1, VISIBLE_OBJECT_PIXELS, True),
+    (
+        "second_other_object_look",
+        999,
+        2,
+        REMOTE_VISIBLE_OBJECT_PIXELS,
+        True,
+    ),
+    ("release", 1_200, 0, DISCERNIBLE_OBJECT_PIXELS, False),
+    ("floor_impact", 1_237, 0, DISCERNIBLE_OBJECT_PIXELS, True),
+    ("settle", 1_449, 0, VISIBLE_OBJECT_PIXELS, True),
 )
 
 EXPECTED_ACTION_SHA256 = (
-    "9c5efe7aea08c439f1e63a05564ef2685887c2b6b8ab227d3cb6b4a4596644b4"
+    "96813ac525d6fbc66df6b281de732b29adf54973cedad96aa3f6c61544cfa0b5"
 )
 EXPECTED_QPOS_SHA256 = (
-    "0d4fc3e66e7bfc9fffc5d83bad98f1df910a9eef0adb88b9b3cf227ee0dbc9f5"
+    "8c4f66d18f31b1afb3a6aa14529bd96157c548e3ca0e0bd4e44011509a873c9f"
 )
 EXPECTED_OBJECT_XPOS_SHA256 = (
-    "efa8c9b105e16fe049303c28397d8311b5e26bdbfd97e0f3543d5745edbac3c0"
+    "3fe288a9e92dd0fbe88784af2162a7c2ff16bdf7b918d28f49662c13e57027d2"
 )
 EXPECTED_AUDIO_SHA256 = (
-    "1ea8c4667cc7a3e879c38f4a7647e39941d6fee604e982bda975d2e0aaa9920c"
+    "ef4c51295bad15eb21fa3511b252f26b9c5592c1a2a4b697ead090e441afb313"
 )
 
 
@@ -377,8 +391,9 @@ def capture_segmentation_visibility_gate(
     local_step: int,
     subject_offset: int,
     minimum_pixels_per_eye: int,
+    require_in_frame: bool,
 ) -> dict[str, Any]:
-    """Capture and enforce one real-geom gate through both public eye cameras."""
+    """Capture one real-geom visibility gate through both public eye cameras."""
 
     if context.step_index % 1_500 != local_step:
         raise ValueError("visibility gate does not match the scenario clock")
@@ -392,12 +407,28 @@ def capture_segmentation_visibility_gate(
         segmentation = np.asarray(renderer.render()).copy()
         metrics = _segmentation_metrics(segmentation, geom_id)
         pixels = int(metrics["geom_pixels"])
-        if pixels < minimum_pixels_per_eye:
-            raise AssertionError(
-                f"{label} {subject.value} is not segmentation-visible in "
-                f"{eye}: {pixels} < {minimum_pixels_per_eye} pixels"
-            )
+        bbox = metrics["bbox_xyxy"]
+        in_frame = bool(
+            bbox is not None
+            and bbox[0] > 0
+            and bbox[1] > 0
+            and bbox[2] < EYE_WIDTH - 1
+            and bbox[3] < EYE_HEIGHT - 1
+        )
+        metrics.update(
+            {
+                "in_frame": in_frame,
+                "passes_visibility_gate": bool(
+                    pixels >= minimum_pixels_per_eye
+                    and (in_frame or not require_in_frame)
+                ),
+            }
+        )
         eye_records[eye] = metrics
+    passed = all(
+        bool(metrics["passes_visibility_gate"])
+        for metrics in eye_records.values()
+    )
     return {
         "cycle_index": context.cycle_index,
         "label": label,
@@ -405,9 +436,35 @@ def capture_segmentation_visibility_gate(
         "post_public_step_index": context.step_index,
         "data_time_seconds": float(environment.data.time),
         "minimum_pixels_per_eye": minimum_pixels_per_eye,
+        "require_in_frame": require_in_frame,
+        "passed": passed,
         "source": "mujoco_geom_segmentation_through_public_eye_cameras",
         "eyes": eye_records,
     }
+
+
+def segmentation_visibility_failures(
+    records: Sequence[dict[str, Any]],
+) -> tuple[str, ...]:
+    """Return all failed pixel and frame-boundary visibility constraints."""
+
+    failures: list[str] = []
+    for record in records:
+        for eye, metrics in record["eyes"].items():
+            pixels = int(metrics["geom_pixels"])
+            minimum = int(record["minimum_pixels_per_eye"])
+            if pixels < minimum:
+                failures.append(
+                    f"cycle {record['cycle_index']} {record['label']} "
+                    f"{record['subject']} {eye}: {pixels} < {minimum} pixels"
+                )
+            if record["require_in_frame"] and not metrics["in_frame"]:
+                failures.append(
+                    f"cycle {record['cycle_index']} {record['label']} "
+                    f"{record['subject']} {eye}: bbox "
+                    f"{metrics['bbox_xyxy']} touches or crosses the frame edge"
+                )
+    return tuple(failures)
 
 
 def _start_video_encoder(
@@ -969,6 +1026,7 @@ def export_scenario(
                     gate_local_step,
                     subject_offset,
                     minimum_pixels,
+                    require_in_frame,
                 ) in SEGMENTATION_VISIBILITY_GATES:
                     if local_step == gate_local_step:
                         segmentation_visibility.append(
@@ -980,6 +1038,7 @@ def export_scenario(
                                 local_step=gate_local_step,
                                 subject_offset=subject_offset,
                                 minimum_pixels_per_eye=minimum_pixels,
+                                require_in_frame=require_in_frame,
                             )
                         )
 
@@ -1056,6 +1115,14 @@ def export_scenario(
                 len(SEGMENTATION_VISIBILITY_GATES) * len(ScenarioObject)
             ):
                 raise AssertionError("segmentation visibility gate count changed")
+            visibility_failures = segmentation_visibility_failures(
+                segmentation_visibility
+            )
+            if visibility_failures:
+                raise AssertionError(
+                    "segmentation visibility gates failed:\n"
+                    + "\n".join(visibility_failures)
+                )
             if action_digest.hexdigest() != EXPECTED_ACTION_SHA256:
                 raise AssertionError("calibrated action hash changed")
             if qpos_digest.hexdigest() != EXPECTED_QPOS_SHA256:

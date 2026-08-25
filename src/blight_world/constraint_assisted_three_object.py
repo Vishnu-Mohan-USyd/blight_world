@@ -28,7 +28,10 @@ from blight_world.motor_skills import (
     RIGHT_ARM_STIFFNESS_NM_RAD,
     RIGHT_ARM_TARGET_RAD,
 )
-from blight_world.supported_pick_place import LIFT_ARM_SEED_RAD
+from blight_world.supported_pick_place import (
+    LIFT_ARM_SEED_RAD,
+    RIGHT_DIGIT_ACTUATOR_NAMES,
+)
 from blight_world.three_object_scenario import (
     ControllerStep,
     SCENARIO_BODY_NAMES,
@@ -51,10 +54,118 @@ ROOT_YAW_QUATERNION_WXYZ = (0.0, 0.0, 0.0, 1.0)
 ROOT_YAW_ROTATION = np.diag((-1.0, -1.0, 1.0))
 CONTROLLER_ID = "constraint-assisted-three-object-v1"
 
+GRIP_DIGIT_REFERENCE_RAD = {
+    ScenarioObject.BALL: (
+        0.0, 1.012, 1.1224, 0.9016,
+        0.0, 1.012, 1.1224, 0.9016,
+        0.0, 1.012, 1.1224, 0.9016,
+        0.0, 0.4508, 1.012, 1.1224, 0.9016,
+        0.0, -0.828, 0.0, 1.012, 1.012,
+    ),
+    ScenarioObject.BLOCK: (
+        0.0, 1.012, 1.1224, 0.9016,
+        0.0, 1.012, 1.1224, 0.9016,
+        0.0, 1.012, 1.1224, 0.9016,
+        0.0, 0.4508, 1.012, 1.1224, 0.9016,
+        0.0, -0.828, 0.0, 1.012, 1.012,
+    ),
+    ScenarioObject.CYLINDER: (
+        0.0, 0.77, 0.854, 0.686,
+        0.0, 0.77, 0.854, 0.686,
+        0.0, 0.77, 0.854, 0.686,
+        0.0, 0.343, 0.77, 0.854, 0.686,
+        0.0, -0.63, 0.0, 0.77, 0.77,
+    ),
+}
+ASSISTED_HOLD_CENTER_M = {
+    ScenarioObject.BALL: (
+        0.016284136472370515,
+        -0.02759,
+        0.02624554751923478,
+    ),
+    ScenarioObject.BLOCK: (-0.010, -0.060, 0.020),
+    ScenarioObject.CYLINDER: (-0.006, -0.016, 0.022),
+}
+ASSISTED_HOLD_DIGIT_CLOSURE_FRACTION = {
+    ScenarioObject.BALL: 0.45,
+    ScenarioObject.BLOCK: 1.0,
+    ScenarioObject.CYLINDER: 0.85,
+}
+BLOCK_ASSISTED_HOLD_RELATIVE_QUATERNION_WXYZ = (
+    -0.1662171599,
+    0.4587052977,
+    -0.7899618450,
+    -0.3713779599,
+)
+CYLINDER_ASSISTED_HOLD_ROTATION = (
+    (1.0, 0.0, 0.0),
+    (0.0, 0.0, 1.0),
+    (0.0, -1.0, 0.0),
+)
+HEAD_TILT_SIDE_KNOTS_RAD = {
+    0: (
+        (0, 0.0),
+        (299, -0.560000),
+        (599, -0.9265),
+        (699, -0.2888),
+        (849, -0.5119),
+        (999, -0.3905),
+        (1_200, -0.2839),
+    ),
+    1: (
+        (0, 0.0),
+        (299, -0.9707),
+        (599, -0.9397),
+        (699, -0.1006),
+        (849, -0.5254),
+        (999, -0.2256),
+        (1_200, -0.2744),
+    ),
+    2: (
+        (0, 0.0),
+        (299, -1.0000),
+        (599, -0.9433),
+        (699, -0.1345),
+        (849, -0.1757),
+        (999, -0.4143),
+        (1_200, -0.2638),
+    ),
+}
+LEFT_EYE_TORSION_KNOTS_RAD = {
+    0: (
+        (0, 0.0),
+        (299, -0.00327),
+        (599, 0.00022),
+        (699, -0.00206),
+        (849, -0.00044),
+        (999, 0.00019),
+        (1_200, 0.00058),
+    ),
+    1: (
+        (0, 0.0),
+        (299, -0.00242),
+        (599, 0.00126),
+        (699, 0.00405),
+        (849, -0.00153),
+        (999, -0.00017),
+        (1_200, 0.00068),
+    ),
+    2: (
+        (0, 0.0),
+        (299, 0.00137),
+        (599, 0.00111),
+        (699, 0.00047),
+        (849, 0.00071),
+        (999, -0.00134),
+        (1_200, -0.00087),
+    ),
+}
+
 
 Vector3 = tuple[float, float, float]
+Quaternion = tuple[float, float, float, float]
+DigitReference = tuple[float, ...]
 EventKey = tuple[int, ScenarioEventKind]
-
 
 @dataclass(frozen=True, slots=True)
 class ConstraintAssistedControllerState:
@@ -64,6 +175,21 @@ class ConstraintAssistedControllerState:
     initial_arm_reference_rad: tuple[float, ...]
     attach_positions_m: tuple[Vector3 | None, Vector3 | None, Vector3 | None]
     inspect_positions_m: tuple[Vector3 | None, Vector3 | None, Vector3 | None]
+    attach_relative_quaternions: tuple[
+        Quaternion | None,
+        Quaternion | None,
+        Quaternion | None,
+    ]
+    hold_relative_quaternions: tuple[
+        Quaternion | None,
+        Quaternion | None,
+        Quaternion | None,
+    ]
+    digit_start_references_rad: tuple[
+        DigitReference | None,
+        DigitReference | None,
+        DigitReference | None,
+    ]
     emitted_events: frozenset[EventKey]
     saturation_rows: int
 
@@ -72,6 +198,20 @@ class ConstraintAssistedControllerState:
             raise ValueError("step_index must be non-negative")
         if len(self.initial_arm_reference_rad) != len(RIGHT_ARM_ACTUATOR_NAMES):
             raise ValueError("initial arm reference has the wrong length")
+        if any(
+            reference is not None
+            and len(reference) != len(RIGHT_DIGIT_ACTUATOR_NAMES)
+            for reference in self.digit_start_references_rad
+        ):
+            raise ValueError("digit start reference has the wrong length")
+        if any(
+            quaternion is not None and len(quaternion) != 4
+            for quaternion in (
+                *self.attach_relative_quaternions,
+                *self.hold_relative_quaternions,
+            )
+        ):
+            raise ValueError("relative attachment quaternion has the wrong length")
         if self.saturation_rows < 0:
             raise ValueError("saturation_rows must be non-negative")
 
@@ -86,6 +226,7 @@ class ConstraintAssistedThreeObjectController:
         "_floor_geom_id",
         "_grip_mocap_id",
         "_model",
+        "_object_collision_masks",
         "_object_geom_ids",
         "_root_mocap_id",
         "_root_support_equality_id",
@@ -125,6 +266,13 @@ class ConstraintAssistedThreeObjectController:
             )
             for target in ScenarioObject
         }
+        self._object_collision_masks = {
+            target: (
+                int(environment.model.geom_contype[geom_id]),
+                int(environment.model.geom_conaffinity[geom_id]),
+            )
+            for target, geom_id in self._object_geom_ids.items()
+        }
         self._floor_geom_id = int(environment.model.geom("floor").id)
 
     @property
@@ -156,6 +304,7 @@ class ConstraintAssistedThreeObjectController:
         """Apply the one-time proven root orientation stage and reset anchors."""
 
         self._validate_environment(environment)
+        self._restore_object_collisions()
         if schedule != ScenarioSchedule.default() or seed != SCENARIO_SEED:
             raise ValueError("controller requires the frozen schedule and seed 1401")
         qpos = np.asarray(environment.data.qpos, dtype=np.float64).copy()
@@ -193,6 +342,9 @@ class ConstraintAssistedThreeObjectController:
             initial_arm_reference_rad=initial_arm,
             attach_positions_m=(None, None, None),
             inspect_positions_m=(None, None, None),
+            attach_relative_quaternions=(None, None, None),
+            hold_relative_quaternions=(None, None, None),
+            digit_start_references_rad=(None, None, None),
             emitted_events=frozenset(),
             saturation_rows=0,
         )
@@ -265,6 +417,9 @@ class ConstraintAssistedThreeObjectController:
         emitted = set(state.emitted_events)
         attach_positions = list(state.attach_positions_m)
         inspect_positions = list(state.inspect_positions_m)
+        attach_relative_quaternions = list(state.attach_relative_quaternions)
+        hold_relative_quaternions = list(state.hold_relative_quaternions)
+        digit_start_references = list(state.digit_start_references_rad)
 
         self._maybe_emit_floor_impact(
             environment,
@@ -306,17 +461,52 @@ class ConstraintAssistedThreeObjectController:
             object_position = np.asarray(
                 environment.data.body(target_body_name).xpos
             ).copy()
+            object_quaternion = np.asarray(
+                environment.data.body(target_body_name).xquat,
+                dtype=np.float64,
+            ).copy()
+            hand_quaternion = np.asarray(
+                environment.data.body("right_hand").xquat,
+                dtype=np.float64,
+            ).copy()
             attach_positions[cycle] = self._vector3(object_position)
+            attach_relative = self._multiply_quaternions(
+                self._conjugate_quaternion(hand_quaternion),
+                object_quaternion,
+            )
+            attach_relative_quaternions[cycle] = self._quaternion(attach_relative)
+            if target is ScenarioObject.BALL:
+                hold_relative = attach_relative
+            elif target is ScenarioObject.BLOCK:
+                hold_relative = self._normalize_quaternion(
+                    np.asarray(
+                        BLOCK_ASSISTED_HOLD_RELATIVE_QUATERNION_WXYZ,
+                        dtype=np.float64,
+                    )
+                )
+            else:
+                hold_relative = self._rotation_matrix_to_quaternion(
+                    np.asarray(
+                        CYLINDER_ASSISTED_HOLD_ROTATION,
+                        dtype=np.float64,
+                    )
+                )
+            hold_relative_quaternions[cycle] = self._quaternion(hold_relative)
             environment.data.mocap_pos[self._grip_mocap_id] = object_position
             environment.data.mocap_quat[
                 self._grip_mocap_id
-            ] = environment.data.body(target_body_name).xquat
+            ] = object_quaternion
+            self._suppress_object_collisions(target)
             environment.data.eq_active[self._equality_ids[target]] = 1
             mujoco.mj_forward(environment.model, environment.data)
             inspect = station + ROOT_YAW_ROTATION @ np.asarray(
                 (0.067, -0.257, 0.031), dtype=np.float64
             )
             inspect_positions[cycle] = self._vector3(inspect)
+            digit_start_references[cycle] = tuple(
+                float(environment.data.qpos[self._channels[name].qpos_address])
+                for name in RIGHT_DIGIT_ACTUATOR_NAMES
+            )
             hand_distance = float(
                 np.linalg.norm(
                     object_position
@@ -333,26 +523,39 @@ class ConstraintAssistedThreeObjectController:
 
         attach = attach_positions[cycle]
         inspect = inspect_positions[cycle]
-        if attach is not None and 600 <= local_step < 700:
-            attach_array = np.asarray(attach, dtype=np.float64)
-            inspect_array = np.asarray(inspect, dtype=np.float64)
-            environment.data.mocap_pos[self._grip_mocap_id] = (
-                attach_array
-                + self._smooth((local_step - 600) / 100.0)
-                * (inspect_array - attach_array)
+        attach_relative_quaternion = attach_relative_quaternions[cycle]
+        hold_relative_quaternion = hold_relative_quaternions[cycle]
+        grip_anchor: NDArray[np.float64] | None = None
+        if (
+            attach is not None
+            and attach_relative_quaternion is not None
+            and hold_relative_quaternion is not None
+            and 600 <= local_step < 1_200
+        ):
+            hand = environment.data.body("right_hand")
+            hand_rotation = np.asarray(hand.xmat, dtype=np.float64).reshape(3, 3)
+            hand_target = np.asarray(hand.xpos, dtype=np.float64) + hand_rotation @ (
+                np.asarray(ASSISTED_HOLD_CENTER_M[target], dtype=np.float64)
             )
-        elif attach is not None and 700 <= local_step < 1_140:
-            environment.data.mocap_pos[self._grip_mocap_id] = inspect
-        elif attach is not None and 1_140 <= local_step < 1_200:
-            tau = (local_step - 1_140) * environment.dt
-            environment.data.mocap_pos[self._grip_mocap_id] = np.asarray(
-                inspect, dtype=np.float64
-            ) + np.asarray((0.0, 0.75 * tau * tau, 0.4 * tau * tau))
+            blend = self._smooth((local_step - 600) / 99.0)
+            if local_step < 700:
+                grip_anchor = (
+                    (1.0 - blend) * np.asarray(attach, dtype=np.float64)
+                    + blend * hand_target
+                )
+            elif local_step < 1_140:
+                grip_anchor = hand_target
+            else:
+                tau = (local_step - 1_140) * environment.dt
+                grip_anchor = hand_target + np.asarray(
+                    (0.0, 0.75 * tau * tau, 0.4 * tau * tau)
+                )
         elif attach is not None and local_step == 1_200:
             joint_velocity = np.asarray(
                 environment.data.joint(f"{target_body_name}_joint").qvel[:3]
             ).copy()
             environment.data.eq_active[self._equality_ids[target]] = 0
+            self._restore_object_collision(target)
             mujoco.mj_forward(environment.model, environment.data)
             self._emit_once(
                 events,
@@ -365,6 +568,27 @@ class ConstraintAssistedThreeObjectController:
                     ("linear_velocity_z_m_s", float(joint_velocity[2])),
                 ),
             )
+        if grip_anchor is not None:
+            environment.data.mocap_pos[self._grip_mocap_id] = grip_anchor
+            if (
+                attach_relative_quaternion is not None
+                and hold_relative_quaternion is not None
+            ):
+                hand_quaternion = np.asarray(
+                    environment.data.body("right_hand").xquat,
+                    dtype=np.float64,
+                )
+                relative_orientation = self._slerp_quaternions(
+                    np.asarray(attach_relative_quaternion, dtype=np.float64),
+                    np.asarray(hold_relative_quaternion, dtype=np.float64),
+                    self._smooth((local_step - 600) / 99.0),
+                )
+                environment.data.mocap_quat[self._grip_mocap_id] = (
+                    self._multiply_quaternions(
+                        hand_quaternion,
+                        relative_orientation,
+                    )
+                )
 
         action = np.zeros(environment.action_space.shape, dtype=np.float32)
         if local_step < 300:
@@ -419,6 +643,28 @@ class ConstraintAssistedThreeObjectController:
                 stiffness,
                 damping,
             )
+
+        if 600 <= local_step < 1_200:
+            closure = self._smooth((local_step - 599) / 100.0)
+            closure *= ASSISTED_HOLD_DIGIT_CLOSURE_FRACTION[target]
+            start_references = digit_start_references[cycle]
+            if start_references is None:
+                raise AssertionError("digit closure lacks its live start reference")
+            for actuator_name, start_reference, terminal_reference in zip(
+                RIGHT_DIGIT_ACTUATOR_NAMES,
+                start_references,
+                GRIP_DIGIT_REFERENCE_RAD[target],
+                strict=True,
+            ):
+                channel = self._channels[actuator_name]
+                saturation_rows += self._command_pd(
+                    action,
+                    actuator_name,
+                    start_reference
+                    + closure * (terminal_reference - start_reference),
+                    0.20 * channel.gear,
+                    0.01 * channel.gear,
+                )
 
         if local_step < 300:
             sine = math.sin(2.0 * math.pi * local_time)
@@ -479,40 +725,85 @@ class ConstraintAssistedThreeObjectController:
         saturation_rows += self._command_pd(
             action, "act:head_tilt", head_tilt, 1.0, 0.2
         )
+        head_tilt_side = self._smooth_knot_reference(
+            local_step,
+            HEAD_TILT_SIDE_KNOTS_RAD[cycle],
+        )
+        saturation_rows += self._command_pd(
+            action,
+            "act:head_tilt_side",
+            head_tilt_side,
+            2.0,
+            0.5,
+        )
+        left_torsion = self._smooth_knot_reference(
+            local_step,
+            LEFT_EYE_TORSION_KNOTS_RAD[cycle],
+        )
+        for side, reference in (("left", left_torsion), ("right", -left_torsion)):
+            saturation_rows += self._command_pd(
+                action,
+                f"act:{side}_eye_torsional",
+                reference,
+                0.002,
+                0.0004,
+            )
 
+        left_camera_id = int(environment.model.camera("eye_left").id)
+        right_camera_id = int(environment.model.camera("eye_right").id)
+        eye_midpoint = 0.5 * (
+            np.asarray(
+                environment.data.cam_xpos[left_camera_id], dtype=np.float64
+            )
+            + np.asarray(
+                environment.data.cam_xpos[right_camera_id], dtype=np.float64
+            )
+        )
+        camera_rotation = np.asarray(
+            environment.data.cam_xmat[left_camera_id], dtype=np.float64
+        ).reshape(3, 3)
+        direction = look_position - eye_midpoint
+        direction /= np.linalg.norm(direction)
+        forward_component = float(direction @ (-camera_rotation[:, 2]))
+        horizontal_reference = math.atan2(
+            float(direction @ camera_rotation[:, 0]), forward_component
+        )
+        vertical_reference = math.atan2(
+            float(direction @ camera_rotation[:, 1]), forward_component
+        )
         for side, horizontal_sign in (("left", -1.0), ("right", 1.0)):
-            camera_id = int(environment.model.camera(f"eye_{side}").id)
-            camera_rotation = np.asarray(
-                environment.data.cam_xmat[camera_id], dtype=np.float64
-            ).reshape(3, 3)
-            direction = look_position - np.asarray(
-                environment.data.cam_xpos[camera_id], dtype=np.float64
-            )
-            direction /= np.linalg.norm(direction)
-            forward_component = float(direction @ (-camera_rotation[:, 2]))
-            horizontal_error = math.atan2(
-                float(direction @ camera_rotation[:, 0]), forward_component
-            )
-            vertical_error = math.atan2(
-                float(direction @ camera_rotation[:, 1]), forward_component
-            )
             horizontal = self._channels[f"act:{side}_eye_horizontal"]
             vertical = self._channels[f"act:{side}_eye_vertical"]
+            current_horizontal = float(
+                environment.data.qpos[horizontal.qpos_address]
+            )
+            current_vertical = float(environment.data.qpos[vertical.qpos_address])
+            commanded_horizontal = current_horizontal + float(
+                np.clip(
+                    horizontal_sign * horizontal_reference - current_horizontal,
+                    -0.15,
+                    0.15,
+                )
+            )
+            commanded_vertical = current_vertical + float(
+                np.clip(
+                    vertical_reference - current_vertical,
+                    -0.15,
+                    0.15,
+                )
+            )
             horizontal_range = environment.model.jnt_range[horizontal.joint_id]
             vertical_range = environment.model.jnt_range[vertical.joint_id]
-            horizontal_reference = float(
+            clipped_horizontal_reference = float(
                 np.clip(
-                    environment.data.qpos[horizontal.qpos_address]
-                    + horizontal_sign
-                    * np.clip(horizontal_error, -0.15, 0.15),
+                    commanded_horizontal,
                     horizontal_range[0] + 0.04,
                     horizontal_range[1] - 0.04,
                 )
             )
-            vertical_reference = float(
+            clipped_vertical_reference = float(
                 np.clip(
-                    environment.data.qpos[vertical.qpos_address]
-                    + np.clip(vertical_error, -0.15, 0.15),
+                    commanded_vertical,
                     vertical_range[0] + 0.04,
                     vertical_range[1] - 0.04,
                 )
@@ -520,14 +811,14 @@ class ConstraintAssistedThreeObjectController:
             saturation_rows += self._command_pd(
                 action,
                 f"act:{side}_eye_horizontal",
-                horizontal_reference,
+                clipped_horizontal_reference,
                 0.02,
                 0.002,
             )
             saturation_rows += self._command_pd(
                 action,
                 f"act:{side}_eye_vertical",
-                vertical_reference,
+                clipped_vertical_reference,
                 0.02,
                 0.002,
             )
@@ -588,6 +879,15 @@ class ConstraintAssistedThreeObjectController:
             initial_arm_reference_rad=state.initial_arm_reference_rad,
             attach_positions_m=tuple(attach_positions),  # type: ignore[arg-type]
             inspect_positions_m=tuple(inspect_positions),  # type: ignore[arg-type]
+            attach_relative_quaternions=tuple(  # type: ignore[arg-type]
+                attach_relative_quaternions
+            ),
+            hold_relative_quaternions=tuple(  # type: ignore[arg-type]
+                hold_relative_quaternions
+            ),
+            digit_start_references_rad=tuple(  # type: ignore[arg-type]
+                digit_start_references
+            ),
             emitted_events=frozenset(emitted),
             saturation_rows=saturation_rows,
         )
@@ -753,12 +1053,154 @@ class ConstraintAssistedThreeObjectController:
         return 3.0 * bounded * bounded - 2.0 * bounded * bounded * bounded
 
     @staticmethod
+    def _smooth_knot_reference(
+        step_index: int,
+        knots: tuple[tuple[int, float], ...],
+    ) -> float:
+        """Interpolate calibrated joint references with a C1 smoothstep."""
+
+        if not knots:
+            raise ValueError("reference knots must not be empty")
+        if step_index <= knots[0][0]:
+            return knots[0][1]
+        for (start_step, start), (stop_step, stop) in zip(
+            knots,
+            knots[1:],
+        ):
+            if stop_step <= start_step:
+                raise ValueError("reference knot steps must be strictly increasing")
+            if step_index <= stop_step:
+                fraction = (step_index - start_step) / (stop_step - start_step)
+                blend = ConstraintAssistedThreeObjectController._smooth(fraction)
+                return start + blend * (stop - start)
+        return knots[-1][1]
+
+    @staticmethod
+    def _conjugate_quaternion(
+        quaternion: NDArray[np.float64],
+    ) -> NDArray[np.float64]:
+        """Return the inverse of one unit MuJoCo quaternion in WXYZ order."""
+
+        return np.asarray(
+            (
+                quaternion[0],
+                -quaternion[1],
+                -quaternion[2],
+                -quaternion[3],
+            ),
+            dtype=np.float64,
+        )
+
+    @staticmethod
+    def _multiply_quaternions(
+        left: NDArray[np.float64],
+        right: NDArray[np.float64],
+    ) -> NDArray[np.float64]:
+        """Multiply WXYZ quaternions and return a normalized result."""
+
+        result = np.empty(4, dtype=np.float64)
+        mujoco.mju_mulQuat(result, left, right)
+        return ConstraintAssistedThreeObjectController._normalize_quaternion(result)
+
+    @staticmethod
+    def _normalize_quaternion(
+        quaternion: NDArray[np.float64],
+    ) -> NDArray[np.float64]:
+        """Return a finite unit WXYZ quaternion."""
+
+        if quaternion.shape != (4,) or not np.all(np.isfinite(quaternion)):
+            raise ValueError("attachment quaternion must contain four finite values")
+        result = np.asarray(quaternion, dtype=np.float64).copy()
+        norm = float(np.linalg.norm(result))
+        if norm <= 0.0:
+            raise ValueError("attachment quaternion became invalid")
+        return result / norm
+
+    @staticmethod
+    def _rotation_matrix_to_quaternion(
+        rotation: NDArray[np.float64],
+    ) -> NDArray[np.float64]:
+        """Convert one hand-local 3x3 rotation to a WXYZ quaternion."""
+
+        if rotation.shape != (3, 3) or not np.all(np.isfinite(rotation)):
+            raise ValueError("assisted-hold rotation must be finite and 3x3")
+        quaternion = np.empty(4, dtype=np.float64)
+        mujoco.mju_mat2Quat(
+            quaternion,
+            np.ascontiguousarray(rotation, dtype=np.float64).reshape(9),
+        )
+        return ConstraintAssistedThreeObjectController._normalize_quaternion(
+            quaternion
+        )
+
+    @staticmethod
+    def _slerp_quaternions(
+        start: NDArray[np.float64],
+        stop: NDArray[np.float64],
+        fraction: float,
+    ) -> NDArray[np.float64]:
+        """Shortest-path spherical interpolation between unit WXYZ quaternions."""
+
+        start_unit = ConstraintAssistedThreeObjectController._normalize_quaternion(
+            start
+        )
+        stop_unit = ConstraintAssistedThreeObjectController._normalize_quaternion(
+            stop
+        )
+        bounded = float(np.clip(fraction, 0.0, 1.0))
+        dot = float(np.dot(start_unit, stop_unit))
+        if dot < 0.0:
+            stop_unit = -stop_unit
+            dot = -dot
+        dot = float(np.clip(dot, -1.0, 1.0))
+        if dot > 0.9995:
+            return ConstraintAssistedThreeObjectController._normalize_quaternion(
+                start_unit + bounded * (stop_unit - start_unit)
+            )
+        angle = math.acos(dot)
+        denominator = math.sin(angle)
+        result = (
+            math.sin((1.0 - bounded) * angle) / denominator * start_unit
+            + math.sin(bounded * angle) / denominator * stop_unit
+        )
+        return ConstraintAssistedThreeObjectController._normalize_quaternion(result)
+
+    @staticmethod
+    def _quaternion(values: NDArray[np.floating]) -> Quaternion:
+        return (
+            float(values[0]),
+            float(values[1]),
+            float(values[2]),
+            float(values[3]),
+        )
+
+    @staticmethod
     def _vector3(values: NDArray[np.floating]) -> Vector3:
         return float(values[0]), float(values[1]), float(values[2])
 
     def _validate_environment(self, environment: ThreeObjectScenarioEnv) -> None:
         if environment is not self._environment or environment.model is not self._model:
             raise ValueError("controller belongs to a different environment")
+
+    def _suppress_object_collisions(self, target: ScenarioObject) -> None:
+        geom_id = self._object_geom_ids[target]
+        self._model.geom_contype[geom_id] = 0
+        self._model.geom_conaffinity[geom_id] = 0
+
+    def _restore_object_collision(self, target: ScenarioObject) -> None:
+        geom_id = self._object_geom_ids[target]
+        contype, conaffinity = self._object_collision_masks[target]
+        self._model.geom_contype[geom_id] = contype
+        self._model.geom_conaffinity[geom_id] = conaffinity
+
+    def _restore_object_collisions(self) -> None:
+        for target in ScenarioObject:
+            self._restore_object_collision(target)
+
+    def close(self) -> None:
+        """Restore collision masks changed by the assisted hold."""
+
+        self._restore_object_collisions()
 
 
 def constraint_assisted_three_object_controller_factory(

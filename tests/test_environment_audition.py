@@ -124,15 +124,35 @@ def test_ball_table_impact_triggers_positioned_audio(
     auditory_environment.set_state(qpos, qvel)
     mujoco.mj_forward(auditory_environment.model, auditory_environment.data)
     auditory_environment.audition.reset(seed=23)
+    renderer = auditory_environment.audition.renderer
+    original_play_transient = renderer.play_transient
+    impact_attachments: list[Attachment] = []
+
+    def recording_play_transient(
+        clip_id: str,
+        attachment: Attachment,
+        **kwargs: object,
+    ) -> int | None:
+        impact_attachments.append(attachment)
+        return original_play_transient(  # type: ignore[arg-type]
+            clip_id, attachment, **kwargs
+        )
+
+    renderer.play_transient = recording_play_transient  # type: ignore[method-assign]
 
     blocks = []
-    for _ in range(16):
-        observation, *_ = auditory_environment.step(
-            np.zeros(auditory_environment.action_space.shape, dtype=np.float32)
-        )
-        blocks.append(observation["audition"])
+    try:
+        for _ in range(16):
+            observation, *_ = auditory_environment.step(
+                np.zeros(auditory_environment.action_space.shape, dtype=np.float32)
+            )
+            blocks.append(observation["audition"])
+    finally:
+        renderer.play_transient = original_play_transient  # type: ignore[method-assign]
     pressure = np.concatenate(blocks, axis=1)
 
+    assert impact_attachments
+    assert all(isinstance(attachment, StaticAttachment) for attachment in impact_attachments)
     assert pressure.shape == (2, 16 * 480)
     assert np.all(np.isfinite(pressure))
     assert np.max(np.abs(pressure)) > 0

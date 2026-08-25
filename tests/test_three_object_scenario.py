@@ -29,6 +29,7 @@ from blight_world.three_object_scenario import (
     dispatch_controller,
     next_object,
 )
+from mimo_audition.materials import AcousticMaterialResolver
 
 
 TOOLS_DIRECTORY = Path(__file__).resolve().parents[1] / "tools"
@@ -161,6 +162,14 @@ def test_scene_has_exact_free_objects_mocap_anchors_and_weld_defaults() -> None:
             assert int(model.geom_contype[geom_id]) != 0
             assert int(model.geom_conaffinity[geom_id]) != 0
             rgba.append(model.geom_rgba[geom_id].copy())
+        materials = AcousticMaterialResolver(model)
+        assert materials.material(int(model.geom("demo_table_top").id)) == "wood"
+        assert materials.material(int(model.geom("demo_ball_geom").id)) == "rubber"
+        assert materials.material(int(model.geom("demo_block_geom").id)) == "wood"
+        assert (
+            materials.material(int(model.geom("demo_cylinder_geom").id))
+            == "plastic"
+        )
         assert all(
             not np.array_equal(first, second)
             for index, first in enumerate(rgba)
@@ -357,6 +366,7 @@ def test_constraint_assisted_controller_matches_frozen_physics_hashes() -> None:
                 gate_local_step,
                 subject_offset,
                 minimum_pixels,
+                require_in_frame,
             ) in SEGMENTATION_VISIBILITY_GATES:
                 if local_step == gate_local_step:
                     visibility_records.append(
@@ -368,6 +378,7 @@ def test_constraint_assisted_controller_matches_frozen_physics_hashes() -> None:
                             local_step=gate_local_step,
                             subject_offset=subject_offset,
                             minimum_pixels_per_eye=minimum_pixels,
+                            require_in_frame=require_in_frame,
                         )
                     )
             diagnostics = dict(result.diagnostics)
@@ -401,12 +412,15 @@ def test_constraint_assisted_controller_matches_frozen_physics_hashes() -> None:
             gate[0] for gate in SEGMENTATION_VISIBILITY_GATES
         }
         for record in visibility_records:
+            assert record["passed"] is True
             eyes = record["eyes"]
             assert isinstance(eyes, dict)
             assert set(eyes) == {"eye_left", "eye_right"}
             for metrics in eyes.values():
                 assert isinstance(metrics, dict)
                 assert metrics["geom_pixels"] >= record["minimum_pixels_per_eye"]
+                if record["require_in_frame"]:
+                    assert metrics["in_frame"] is True
 
         coverage = validate_event_coverage(events)
         assert all(row["event_count"] == 7 for row in coverage.values())
@@ -416,7 +430,7 @@ def test_constraint_assisted_controller_matches_frozen_physics_hashes() -> None:
             if event.kind is ScenarioEventKind.FLOOR_IMPACT
         ]
         assert [event.time_seconds for event in impacts] == pytest.approx(
-            [12.38, 27.38, 42.38], abs=5e-11
+            [12.38, 27.36, 42.37], abs=5e-11
         )
         assert all(dict(event.metrics)["grip_active"] == 0.0 for event in impacts)
     finally:

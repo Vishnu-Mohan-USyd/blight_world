@@ -14,12 +14,13 @@ from mimo_audition.continuous import ContinuousEmission
 from mimo_audition.contacts import ImpactDetector
 from mimo_audition.mujoco_scene import MujocoAcousticScene
 from mimo_audition.renderer import BinauralRenderer
+from mimo_audition.room import project_source_position
 from mimo_audition.scrape import (
     ScrapeDiagnostic,
     ScrapeSynthesizer,
     ScrapeTracker,
 )
-from mimo_audition.sources import AudioSourceSpec
+from mimo_audition.sources import AudioSourceSpec, StaticAttachment
 
 
 class MIMoAudition:
@@ -119,9 +120,10 @@ class MIMoAudition:
         """Schedule new impacts and render one 5 ms acoustic interval."""
 
         for event in self._impacts.detect():
+            position = project_source_position(event.world_position_m)
             self.renderer.play_transient(
                 event.clip_id,
-                event.attachment,
+                StaticAttachment(tuple(map(float, position))),
                 gain_db=event.gain_db,
                 delay_s=0.010,
                 impact_energy_j=event.energy_j,

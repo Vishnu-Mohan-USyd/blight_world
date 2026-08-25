@@ -49,11 +49,13 @@ class AcousticMaterialResolver:
         body_id = int(self.model.geom_bodyid[geom_id])
         if int(self.model.body_rootid[body_id]) == self._mimo_root_id:
             return "soft"
-        if name == "block_geom" or name.startswith("table_"):
+        if name in {"block_geom", "demo_block_geom"} or name.startswith(
+            ("table_", "demo_table")
+        ):
             return "wood"
-        if name == "ball_geom":
+        if name in {"ball_geom", "demo_ball_geom"}:
             return "rubber"
-        if name == "cylinder_geom":
+        if name in {"cylinder_geom", "demo_cylinder_geom"}:
             return "plastic"
         return "hard"
 
