@@ -49,3 +49,7 @@
   Proceed autonomously through implementation, validation, checkpointing, and
   artifact production; ask only when a genuinely new authority or material
   user choice is required.
+- For a requested showcase, make the user's visible storyboard the completion
+  checklist and inspect those event frames early. Do not substitute hashes,
+  infrastructure work, or a narrower validated behavior for a missing action;
+  the artifact is unfinished until every requested action is plainly visible.
