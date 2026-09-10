@@ -215,6 +215,7 @@ class BinauralRenderer:
         gain_db: float = 0.0,
         delay_s: float = 0.0,
         impact_energy_j: float = 0.0,
+        emit_sample: int | None = None,
     ) -> int | None:
         """Best-effort schedule an unregistered physical-impact one-shot.
 
@@ -238,6 +239,7 @@ class BinauralRenderer:
             source,
             delay_s,
             impact_priority=impact_energy_j,
+            emit_sample=emit_sample,
         )
 
     def _dry_end_sample(self, voice: _Voice) -> int | None:
@@ -374,12 +376,23 @@ class BinauralRenderer:
         delay_s: float,
         *,
         impact_priority: float | None,
+        emit_sample: int | None = None,
     ) -> int | None:
         """Admit a complete dry interval before allocating renderer state."""
 
         if not isfinite(delay_s) or delay_s < 0:
             raise ValueError("delay_s must be finite and non-negative")
-        start_sample = self._sample_cursor + round(delay_s * self.config.sample_rate_hz)
+        if emit_sample is not None:
+            if (
+                isinstance(emit_sample, bool)
+                or not isinstance(emit_sample, int)
+                or emit_sample < self._sample_cursor
+                or delay_s != 0
+            ):
+                raise ValueError("emit_sample must be a current/future integer with zero delay_s")
+            start_sample = emit_sample
+        else:
+            start_sample = self._sample_cursor + round(delay_s * self.config.sample_rate_hz)
         clip = self.clips.get(source.clip_id)
         dry_end_sample = None if source.loop else start_sample + clip.samples.size
         candidate = self._dry_block_interval(start_sample, dry_end_sample)

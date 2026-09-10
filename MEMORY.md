@@ -1,5 +1,33 @@
 # Project lessons
 
+Read [docs/HANDOVER.md](docs/HANDOVER.md) first for the current setup, commands,
+module map, accepted examples, timing contracts and detailed failure analysis.
+The notes below preserve lessons from earlier work; they are not an instruction
+to broaden a user's task or run every historical validation workflow.
+
+Current priorities from the conversation:
+
+- Deliver the requested visible sequence. A build, harness or passing array check
+  cannot substitute for inspecting the actual eyes/body over the complete video.
+- Reuse `.venv-unreal`, UE 5.5.4 and the pinned stack. Keep Python-owned physics,
+  refreshed observation copies and simulation-clocked audio. Do not rebuild
+  infrastructure just to produce another example.
+- Use `CorrectedMuscleModel` when selecting muscles: setting activation is not a
+  timestep. Restore direct-flight delay to both Steam Audio branches exactly once.
+- The corrected street reference is `artifacts/unreal_street_run_redo`, not the
+  earlier `unreal_street_run` video. Its gait is assisted and uses adjusted joint
+  damping; realistic-looking movement does not establish autonomous running.
+- The road redo fixed unstable pelvis damping, infeasible ankle targets, height
+  tracking and missing acceleration torques. Compare actual moving-state data
+  with the reference; do not hide bad motion by leveling the eye cameras.
+- Use appropriate recorded footstep assets and physical landing events. Waveform
+  checks establish timing/format, not perceived sound quality when listening is
+  unavailable.
+- Keep accepted media intact. Generated artifacts are ignored but remain local;
+  the guide explains recreating required manifests after a fresh checkout.
+
+## Earlier lessons
+
 - Hold an approved frozen specification and keep advancing until the user
   explicitly changes it. Do not idle or flip between incompatible designs.
 - Prioritize a coherent functioning auditory framework over infant-anatomy
@@ -57,3 +85,18 @@
   regenerate it. Time-box diagnostics to representative frames/audio windows;
   do not build new harnesses or launch broad validation unless the direct fix
   actually exposes a deeper problem.
+- A claimed pickup/throw demo must prove that the object remains stationary
+  until hand contact, attaches without a positional snap or levitation, moves
+  through limb kinematics, and inherits release velocity. Disclose all mocap
+  world-space routes; they cannot substitute for limb action. Before declaring
+  impact audio correct, verify that detected events correlate with the emitted
+  waveform in time and content.
+- Quantify embodied motion in a named body-local frame before delivery, then
+  inspect the corresponding visual evidence. World-frame speed alone can hide
+  a sideways or downward action that reads incorrectly in the agent's frame.
+- Direction thresholds cannot substitute for action semantics. Validate the
+  visible limb/object displacement and released-object flight energy as well
+  as the instantaneous body-local velocity before calling an action a throw.
+- A showcase claimed as an eye view must use the public eye observations.
+  Camera pose, aim, up-vector, or frustum overrides are external views and
+  cannot be presented as the agent's eye feeds.

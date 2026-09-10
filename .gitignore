@@ -3,3 +3,10 @@
 __pycache__/
 *.py[cod]
 *.egg-info/
+/.venv-unreal/
+/third_party/
+/artifacts/
+/ue_project/**/Binaries/
+/ue_project/**/Intermediate/
+/ue_project/**/Saved/
+/ue_project/**/DerivedDataCache/

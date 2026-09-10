@@ -170,11 +170,11 @@ def test_full_demo_timeline_replays_public_audio_and_scrape_windows(
 
     assert manifest["raw_sources"][
         "audio_pressure_pa_channels_first_float32_sha256"
-    ] == "d51749cec3e3e76739f8be7077dea40cf153bcf11a213d6cd9bd8ddf4ef1229b"
+    ] == "20daab84d6e896b4ba4477dce4499744af9001198f0863631aab300fd24e026e"
     assert round(
         manifest["media_pressure_mapping"]["peak_pressure_pa"],
         4,
-    ) == 0.8566
+    ) == 0.7738
     assert manifest["configuration"]["behavior_label"] == (
         "kinematically_constrained_external_camera_audition_diagnostic"
     )

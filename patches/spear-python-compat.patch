@@ -1,0 +1,16 @@
+diff --git a/python/pyproject.toml b/python/pyproject.toml
+index fdc71559..e4efc703 100644
+--- a/python/pyproject.toml
++++ b/python/pyproject.toml
+@@ -20,9 +20,9 @@ requires-python = "~=3.11"
+ dependencies = [
+     "mcp==1.28.1",               # tools/run_mcp_server.py
+     "numpy==2.0.2",
+-    "opencv-python==4.10.0.84",
++    "opencv-python-headless==4.11.0.86",
+     "p4python==2025.1.2767466",  # tools/download_content_from_perforce.py
+     "pandas==2.2.3",             # tools
+     "psutil==5.9.0",
+-    "scipy==1.14.1",
++    "scipy==1.13.1",
+     "yacs==0.1.8"]

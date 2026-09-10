@@ -26,6 +26,7 @@ from blight_world import (
     BodyAttachment,
     StaticAttachment,
 )
+from mimo_audition.contacts import ImpactEvent
 from mimo_audition.renderer import BinauralRenderer
 from mimo_audition.sources import Attachment
 
@@ -705,14 +706,35 @@ def _foot_landing_trial(
     def countergravity(_: int, env: BlightWorldEnv) -> None:
         _apply_countergravity(env)
 
-    pressure, events, peak_occupancy = _run_steps(
-        environment,
-        9,
-        force_callback=countergravity,
-    )
+    assert environment.audition is not None
+    detector = environment.audition._impacts
+    original_detect = detector.detect
+    physical_events: list[tuple[float, ImpactEvent]] = []
+
+    def recording_detect() -> tuple[ImpactEvent, ...]:
+        detected = original_detect()
+        physical_events.extend((float(environment.data.time), item) for item in detected)
+        return detected
+
+    detector.detect = recording_detect  # type: ignore[method-assign]
+    try:
+        pressure, events, peak_occupancy = _run_steps(
+            environment,
+            9,
+            force_callback=countergravity,
+        )
+    finally:
+        detector.detect = original_detect  # type: ignore[method-assign]
     event = _first_event(events, "hard_soft")
+    physical_event = next(
+        item for time_seconds, item in physical_events
+        if time_seconds == event["time_s"]
+        and item.clip_id == event["clip_id"]
+        and item.energy_j == event["energy_j"]
+    )
     return {
         "event": event,
+        "physical_body": physical_event.attachment.body_name,
         "audio": _audio_metrics(pressure, event_time_s=event["time_s"]),
         "event_count": len(events),
         "event_material_families": sorted(
@@ -1054,9 +1076,9 @@ def profile_mirrored_feet() -> dict[str, Any]:
     finally:
         environment.close()
 
-    if "left" not in str(trials["left_first"]["event"]["attachment_body"]):
+    if "left" not in str(trials["left_first"]["physical_body"]):
         raise AssertionError("negative-roll fixture did not land left-first")
-    if "right" not in str(trials["right_first"]["event"]["attachment_body"]):
+    if "right" not in str(trials["right_first"]["physical_body"]):
         raise AssertionError("positive-roll fixture did not land right-first")
     ild_left = trials["left_first"]["audio"]["ild_db_left_over_right"]
     ild_right = trials["right_first"]["audio"]["ild_db_left_over_right"]
@@ -1652,8 +1674,8 @@ def render_markdown(report: dict[str, Any]) -> str:
             "",
             (
                 "The -10°/+10° tilted landings selected "
-                f"`{feet['left_first']['event']['attachment_body']}` and "
-                f"`{feet['right_first']['event']['attachment_body']}` respectively, "
+                f"`{feet['left_first']['physical_body']}` and "
+                f"`{feet['right_first']['physical_body']}` respectively, "
                 "with reversed binaural cue signs. The hand and forearm cases use "
                 "countergravity and a labeled 15 N external-force fixture; they are "
                 "not learned behavior."

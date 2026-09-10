@@ -1,0 +1,49 @@
+{
+    "FileVersion": 3,
+    "EngineAssociation": "5.5",
+    "Category": "Simulation",
+    "Description": "MIMo world rendered by SPEAR with external MuJoCo physics.",
+    "Plugins": [
+        {
+            "Name": "SpCore",
+            "Enabled": true
+        },
+        {
+            "Name": "SpServices",
+            "Enabled": true
+        },
+        {
+            "Name": "SpUnrealTypes",
+            "Enabled": true
+        },
+        {
+            "Name": "SpContent",
+            "Enabled": true
+        },
+        {
+            "Name": "SpModuleRules",
+            "Enabled": true
+        },
+        {
+            "Name": "PythonScriptPlugin",
+            "Enabled": true
+        },
+        {
+            "Name": "EditorScriptingUtilities",
+            "Enabled": true
+        }
+    ],
+    "AdditionalPluginDirectories": [
+        "../../third_party/spear/cpp/unreal_plugins"
+    ],
+    "Modules": [
+        {
+            "Name": "BlightWorld",
+            "Type": "Runtime",
+            "LoadingPhase": "Default",
+            "AdditionalDependencies": [
+                "SpCore"
+            ]
+        }
+    ]
+}

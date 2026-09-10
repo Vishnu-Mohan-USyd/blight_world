@@ -323,19 +323,20 @@ class ScrapeTracker:
         self._gate.reset()
         self.before_substep()
 
-    def before_substep(self) -> None:
+    def before_substep(self, kinematic_data: mujoco.MjData | None = None) -> None:
         """Capture body motion immediately before MuJoCo integration."""
 
+        data = self.data if kinematic_data is None else kinematic_data
         for body_id in range(self.model.nbody):
             mujoco.mj_objectVelocity(
                 self.model,
-                self.data,
+                data,
                 mujoco.mjtObj.mjOBJ_BODY,
                 body_id,
                 self._pre_velocity[body_id],
                 0,
             )
-        self._pre_body_position[:] = self.data.xpos
+        self._pre_body_position[:] = data.xpos
 
     def _point_velocity(
         self,

@@ -36,7 +36,12 @@ class MIMoAudition:
         self.data = data
         self.config = config
         self.scene = MujocoAcousticScene(model, data)
-        self.renderer = BinauralRenderer(config)
+        if config.backend == "steam_audio":
+            from mimo_audition.steam_audio import SteamAudioRenderer
+
+            self.renderer = SteamAudioRenderer(config)
+        else:
+            self.renderer = BinauralRenderer(config)
         self._rng = np.random.default_rng(np.random.SeedSequence(0).spawn(1)[0])
         self._impacts = ImpactDetector(model, data, self._rng)
         scrape_config = (
@@ -56,6 +61,7 @@ class MIMoAudition:
         )
         self._pending_substeps: list[NDArray[np.float64]] = []
         self._cache = np.zeros(config.spec.observation_shape, dtype=np.float32)
+        self._pending_scrape_emissions: tuple[ContinuousEmission, ...] = ()
 
     @property
     def observation(self) -> NDArray[np.float32]:
@@ -105,41 +111,58 @@ class MIMoAudition:
             self._scrape_synthesizer.reset(seed)
         self._pending_substeps.clear()
         self._cache.fill(0)
+        self._pending_scrape_emissions = ()
 
-    def before_substep(self) -> None:
+    def before_substep(self, *, kinematic_data: mujoco.MjData | None = None) -> None:
         """Capture pre-integration velocities for impact approach estimates."""
 
-        self._impacts.before_substep()
+        self._impacts.before_substep(kinematic_data)
         if self._scrapes is not None:
-            self._scrapes.before_substep()
+            self._scrapes.before_substep(kinematic_data)
 
     def capture_substep(
         self,
         continuous_emissions: Sequence[ContinuousEmission] = (),
+        *,
+        pose_data: mujoco.MjData | None = None,
     ) -> None:
         """Schedule new impacts and render one 5 ms acoustic interval."""
 
+        steam = self.config.backend == "steam_audio"
+        self.scene.data = self.data if pose_data is None else pose_data
         for event in self._impacts.detect():
-            position = project_source_position(event.world_position_m)
-            self.renderer.play_transient(
-                event.clip_id,
-                StaticAttachment(tuple(map(float, position))),
-                gain_db=event.gain_db,
-                delay_s=0.010,
-                impact_energy_j=event.energy_j,
+            position = event.world_position_m if steam else project_source_position(event.world_position_m)
+            timing = (
+                {"emit_sample": round(float(self.data.time) * self.config.sample_rate_hz)}
+                if steam else {"delay_s": 0.010}
             )
+            self.renderer.play_transient(event.clip_id,
+                StaticAttachment(tuple(map(float, position))), gain_db=event.gain_db,
+                impact_energy_j=event.energy_j, **timing)
         emissions: tuple[ContinuousEmission, ...]
         if self.config.continuous is None:
             emissions = ()
         else:
             emissions = tuple(continuous_emissions)
             if self._scrapes is not None and self._scrape_synthesizer is not None:
-                emissions += self._scrape_synthesizer.render(
-                    self._scrapes.detect()
-                )
+                new_scrapes = self._scrape_synthesizer.render(self._scrapes.detect())
+                if steam:
+                    # Solved contacts first known at t+5ms can emit in the next
+                    # interval, matching the absolute impact event schedule.
+                    emissions += self._pending_scrape_emissions
+                    self._pending_scrape_emissions = new_scrapes
+                else:
+                    emissions += new_scrapes
         self._pending_substeps.append(
             self.renderer.render_substep(self.scene, emissions)
         )
+
+    def close(self) -> None:
+        """Release standalone SDK state, if this sensor owns it."""
+
+        close = getattr(self.renderer, "close", None)
+        if close is not None:
+            close()
 
     def finish_step(self) -> NDArray[np.float32]:
         """Publish exactly two substeps as one Gymnasium observation block."""

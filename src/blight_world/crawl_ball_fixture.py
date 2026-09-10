@@ -13,18 +13,12 @@ pick, lift, grasp, learned policy, or autonomous object-manipulation skill.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from html import escape
 from importlib import resources
-from pathlib import Path
-from tempfile import TemporaryDirectory
 from typing import Any
 
-import mimoEnv
 import mujoco
 import numpy as np
 from gymnasium import utils
-from mimoActuation.actuation import SpringDamperModel
-from mimoEnv.envs.mimo_env import MIMoEnv
 from mimo_audition import AuditionConfig
 from numpy.typing import NDArray
 
@@ -39,18 +33,6 @@ CRAWL_BALL_TABLE_POSITION_M = (-1.8, 1.8, 0.0)
 CRAWL_BALL_CONTACT_GEOM_NAMES = frozenset(
     {"geom:left_ffdistal1", "geom:left_mfdistal1"}
 )
-
-_TEXTURE_PLACEHOLDER = "{{MIMO_TEXTURE_DIR}}"
-_META_PLACEHOLDER = "{{MIMO_META_XML}}"
-_MODEL_PLACEHOLDER = "{{MIMO_MODEL_XML}}"
-_SCENE_EXTENSION_PLACEHOLDER = "{{SCENE_EXTENSION_XML}}"
-
-
-def _xml_path(path: Path) -> str:
-    """Return an absolute XML-safe POSIX path."""
-
-    return escape(path.resolve().as_posix(), quote=True)
-
 
 @dataclass(frozen=True, slots=True)
 class CrawlBallContact:
@@ -151,83 +133,17 @@ class CrawlBallFixtureEnv(UnsupportedStaticSupportEnv):
         height: int = 240,
         audition: AuditionConfig | None = None,
     ) -> None:
-        if isinstance(width, bool) or not isinstance(width, int) or width <= 0:
-            raise ValueError("width must be a positive integer")
-        if isinstance(height, bool) or not isinstance(height, int) or height <= 0:
-            raise ValueError("height must be a positive integer")
-        if audition is not None and not isinstance(audition, AuditionConfig):
-            raise TypeError("audition must be an AuditionConfig or None")
-
-        self._audition_config = audition
-        self.audition = None
-        self._closed = False
         self._contact_recorder: CrawlBallContactRecorder | None = None
-
-        upstream_assets = Path(mimoEnv.__file__).resolve().parent / "assets"
-        meta_xml = upstream_assets / "mimo" / "MIMo_metav2.xml"
-        model_xml = upstream_assets / "mimo" / "MIMo_modelv2.xml"
-        if not upstream_assets.is_dir():
-            raise FileNotFoundError(f"MIMo asset directory not found: {upstream_assets}")
-        for required_file in (meta_xml, model_xml):
-            if not required_file.is_file():
-                raise FileNotFoundError(
-                    f"Required MIMo asset not found: {required_file}"
-                )
-
-        template = (
-            resources.files("blight_world")
-            .joinpath("assets", "crawl_ball_room.xml.template")
-            .read_text(encoding="utf-8")
+        template = resources.files("blight_world").joinpath(
+            "assets", "crawl_ball_room.xml.template"
         )
-        replacements = {
-            _TEXTURE_PLACEHOLDER: _xml_path(upstream_assets),
-            _META_PLACEHOLDER: _xml_path(meta_xml),
-            _MODEL_PLACEHOLDER: _xml_path(model_xml),
-            _SCENE_EXTENSION_PLACEHOLDER: "",
-        }
-        scene_xml = template
-        for placeholder, value in replacements.items():
-            if placeholder not in scene_xml:
-                raise ValueError(f"Scene template is missing placeholder {placeholder}")
-            scene_xml = scene_xml.replace(placeholder, value)
-
-        self._scene_directory: TemporaryDirectory[str] | None = TemporaryDirectory(
-            prefix="blight-world-crawl-ball-"
-        )
-        self._scene_path = Path(self._scene_directory.name) / "crawl_ball_room.xml"
-        self._scene_path.write_text(scene_xml, encoding="utf-8")
-
-        vision_params: dict[str, dict[str, int | float | bool]] = {
-            eye: {
-                "width": width,
-                "height": height,
-                "fovy": 60,
-                "acuity": False,
-                "foveation": False,
-            }
-            for eye in ("eye_left", "eye_right")
-        }
-        try:
-            MIMoEnv.__init__(
-                self,
-                model_path=str(self._scene_path),
+        with resources.as_file(template) as scene_template:
+            super().__init__(
                 width=width,
                 height=height,
-                age=None,
-                proprio_params={"components": []},
-                touch_params=None,
-                vision_params=vision_params,
-                vestibular_params=None,
-                actuation_model=SpringDamperModel,
-                motor_delay=0,
-                goals_in_observation=False,
-                done_active=False,
-                render_mode=None,
+                audition=audition,
+                scene_template=scene_template,
             )
-        except BaseException:
-            self._scene_directory.cleanup()
-            self._scene_directory = None
-            raise
         utils.EzPickle.__init__(
             self,
             width=width,

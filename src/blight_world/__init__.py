@@ -1,4 +1,4 @@
-"""Minimal binocular MIMo v2 world."""
+"""MIMo sensorimotor environments and scripted demonstration helpers."""
 
 from blight_world.environment import BlightWorldEnv
 from blight_world.motor_control import (

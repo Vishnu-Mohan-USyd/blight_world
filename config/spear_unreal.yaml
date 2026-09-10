@@ -1,0 +1,26 @@
+SPEAR:
+  LAUNCH_MODE: editor
+  ENVIRONMENT_VARS:
+    VK_ICD_FILENAMES: /usr/share/vulkan/icd.d/nvidia_icd.json
+  INSTANCE:
+    EDITOR_EXECUTABLE: /home/vishnu/Unreal/UE_5.5.4/Engine/Binaries/Linux/UnrealEditor
+    EDITOR_UPROJECT: /home/vishnu/coding_proj/bl_1/ue_project/BlightWorld/BlightWorld.uproject
+    EDITOR_LAUNCH_MODE: game
+    TEMP_DIR: /home/vishnu/coding_proj/bl_1/ue_project/BlightWorld/Saved/Spear
+    INITIALIZE_CLIENT_MAX_TIME_SECONDS: 600.0
+    CLIENT_INTERNAL_TIMEOUT_SECONDS: 60.0
+    COMMAND_LINE_ARGS:
+      renderoffscreen: null
+      graphicsadapter: 1
+      unattended: null
+      nosound: null
+      resx: 640
+      resy: 480
+      ddc: InstalledNoZenLocalFallback
+SP_SERVICES:
+  INITIALIZE_ENGINE_SERVICE:
+    OVERRIDE_FIXED_DELTA_TIME: true
+    FIXED_DELTA_TIME: 0.01
+  WORLD_REGISTRY_SERVICE:
+    OVERRIDE_GAME_PAUSED: true
+    GAME_PAUSED: true

@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from hashlib import sha256
+from html import escape
 from pathlib import Path
 from typing import Iterator
 
+import mimoEnv
 import mujoco
 import numpy as np
 import pytest
@@ -39,7 +41,7 @@ ACTIVE_START_STEP = int(round(BELLY_SETTLE_STOP_SECONDS / PUBLIC_STEP_SECONDS))
 ACTIVE_STOP_STEP = int(round(BELLY_CRAWL_STOP_SECONDS / PUBLIC_STEP_SECONDS))
 CONTACT_STEP = 2851
 EXPECTED_SCENE_SHA256 = (
-    "69433be412c5d7f894d0cb5c000bae15cc811d1896b2a37ac6c2ec11268392da"
+    "819783d00b8983ae26053e814a3af50439f1ac0f9ad223f081f309265455c50f"
 )
 EXPECTED_ACTION_SHA256 = (
     "46d8fde52bf2bd78c0a4d2a9791a2e056194761816422be58118ee02464fff67"
@@ -51,7 +53,7 @@ EXPECTED_QPOS_SHA256 = (
     "e5379268f771e4f05578297a6df5257e1380e381056bc852e916f9f0a3d7e4ec"
 )
 EXPECTED_AUDIO_SHA256 = (
-    "0c992f10fc13c1be617d6ce09bc800ef17f6c23157b86dffc3506e2fddd5f2b0"
+    "79fb1a31c8d4672b17b7b4f9fd407c316aa42e936eca3affa00d08bb0cd5d7a5"
 )
 EXPECTED_CONTACT_LEFT_EYE_SHA256 = (
     "23ad078ea1ffc360a0fcdf77beb74f3df86639cf71b3e1bdbd3866b776891153"
@@ -68,11 +70,19 @@ EXPECTED_REST_BALL_TRAJECTORY_SHA256 = (
 
 
 def _file_sha256(path: Path) -> str:
-    digest = sha256()
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1 << 20), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+    # Keep the exact scene-byte check independent of the MIMo checkout path.
+    content = path.read_bytes()
+    assets = Path(mimoEnv.__file__).resolve().parent / "assets"
+    for resolved, token in (
+        (assets / "mimo" / "MIMo_metav2.xml", "{{MIMO_META_XML}}"),
+        (assets / "mimo" / "MIMo_modelv2.xml", "{{MIMO_MODEL_XML}}"),
+        (assets, "{{MIMO_TEXTURE_DIR}}"),
+    ):
+        content = content.replace(
+            escape(resolved.as_posix(), quote=True).encode("utf-8"),
+            token.encode("ascii"),
+        )
+    return sha256(content).hexdigest()
 
 
 @pytest.fixture
@@ -428,13 +438,13 @@ def test_quality_48k_continuous_audition_is_nonzero_and_physics_neutral(
     assert with_audition.audio_sha256 == EXPECTED_AUDIO_SHA256
     assert with_audition.audio_nonzero_blocks == 3665
     assert with_audition.audio_peak_abs_pa == pytest.approx(
-        15.131268501281738, abs=1e-12
+        12.987203598022461, abs=1e-12
     )
     assert with_audition.audio_left_rms_pa == pytest.approx(
-        0.4289401855386546, abs=1e-12
+        0.3599577686644569, abs=1e-12
     )
     assert with_audition.audio_right_rms_pa == pytest.approx(
-        0.4216502424524533, abs=1e-12
+        0.35238572050749417, abs=1e-12
     )
 
 

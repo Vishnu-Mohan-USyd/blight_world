@@ -17,6 +17,7 @@ import argparse
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from hashlib import sha256
+from html import escape
 from importlib import metadata
 import json
 import os
@@ -26,6 +27,7 @@ import subprocess
 from tempfile import TemporaryDirectory
 from typing import Any, BinaryIO
 
+import mimoEnv
 import mujoco
 import numpy as np
 from numpy.typing import NDArray
@@ -63,7 +65,7 @@ CONTACT_PUBLIC_STEP = 2_851
 CONTACT_VIDEO_FRAME = CONTACT_PUBLIC_STEP // 2
 
 EXPECTED_SCENE_SHA256 = (
-    "69433be412c5d7f894d0cb5c000bae15cc811d1896b2a37ac6c2ec11268392da"
+    "819783d00b8983ae26053e814a3af50439f1ac0f9ad223f081f309265455c50f"
 )
 EXPECTED_ACTION_SHA256 = (
     "46d8fde52bf2bd78c0a4d2a9791a2e056194761816422be58118ee02464fff67"
@@ -75,7 +77,7 @@ EXPECTED_BALL_TRAJECTORY_SHA256 = (
     "a2123ee5d9c7ad2f100ff6e59569f641770e618a346ad4930e00631f3d645b54"
 )
 EXPECTED_AUDIO_TRANSPORT_SHA256 = (
-    "0c992f10fc13c1be617d6ce09bc800ef17f6c23157b86dffc3506e2fddd5f2b0"
+    "79fb1a31c8d4672b17b7b4f9fd407c316aa42e936eca3affa00d08bb0cd5d7a5"
 )
 EXPECTED_CONTACT_LEFT_EYE_SHA256 = (
     "23ad078ea1ffc360a0fcdf77beb74f3df86639cf71b3e1bdbd3866b776891153"
@@ -86,9 +88,9 @@ EXPECTED_CONTACT_RIGHT_EYE_SHA256 = (
 EXPECTED_CONTACT_LEFT_RED_PIXELS = 2_270
 EXPECTED_CONTACT_RIGHT_RED_PIXELS = 2_163
 EXPECTED_AUDIO_NONZERO_BLOCKS = 3_665
-EXPECTED_AUDIO_PEAK_PA = 15.131268501281738
-EXPECTED_AUDIO_LEFT_RMS_PA = 0.4289401855386546
-EXPECTED_AUDIO_RIGHT_RMS_PA = 0.4216502424524533
+EXPECTED_AUDIO_PEAK_PA = 12.987203598022461
+EXPECTED_AUDIO_LEFT_RMS_PA = 0.359957768664457
+EXPECTED_AUDIO_RIGHT_RMS_PA = 0.3523857205074939
 EXPECTED_BALL_FINAL_POSITION_M = (
     0.8282788213116993,
     0.35641593947774347,
@@ -533,7 +535,18 @@ def export_demo(
         reset_count += 1
         if info != {} or not environment.observation_space.contains(observation):
             raise AssertionError("initial public observation contract changed")
-        if _sha256_file(environment.scene_path) != EXPECTED_SCENE_SHA256:
+        scene_bytes = environment.scene_path.read_bytes()
+        assets = Path(mimoEnv.__file__).resolve().parent / "assets"
+        for resolved, token in (
+            (assets / "mimo" / "MIMo_metav2.xml", "{{MIMO_META_XML}}"),
+            (assets / "mimo" / "MIMo_modelv2.xml", "{{MIMO_MODEL_XML}}"),
+            (assets, "{{MIMO_TEXTURE_DIR}}"),
+        ):
+            scene_bytes = scene_bytes.replace(
+                escape(resolved.as_posix(), quote=True).encode("utf-8"),
+                token.encode("ascii"),
+            )
+        if sha256(scene_bytes).hexdigest() != EXPECTED_SCENE_SHA256:
             raise AssertionError("crawl-ball materialized scene changed")
         recorder = environment.start_contact_recording()
         controller = UnsupportedBellyCrawlController(environment)

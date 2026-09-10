@@ -1,0 +1,165 @@
+<mujoco model="blight_street_run">
+  <compiler angle="degree" coordinate="local" texturedir="{{MIMO_TEXTURE_DIR}}"/>
+  <option timestep="0.005" gravity="0 0 -9.81"/>
+  <size njmax="1200" nconmax="200"/>
+  <visual>
+    <global offwidth="960" offheight="540"/>
+    <quality shadowsize="2048"/>
+  </visual>
+  <default>
+    <geom condim="3" friction="0.9 0.1 0.1" contype="1" conaffinity="1"/>
+  </default>
+  <asset>
+    <material name="asphalt" rgba="0.055 0.060 0.075 1" specular="0.08" shininess="0"/>
+    <material name="sidewalk" rgba="0.34 0.36 0.39 1" specular="0.05" shininess="0"/>
+    <material name="verge" rgba="0.055 0.095 0.075 1" specular="0" shininess="0"/>
+    <material name="edge_paint" rgba="0.80 0.82 0.78 1" specular="0.1" shininess="0.02"/>
+    <material name="center_paint" rgba="0.95 0.66 0.14 1" specular="0.1" shininess="0.02"/>
+    <material name="lamp_metal" rgba="0.12 0.14 0.17 1" specular="0.45" shininess="0.18"/>
+    <material name="lamp_panel" rgba="1 0.80 0.47 1" emission="3" specular="0" shininess="0"/>
+  </asset>
+  <include file="{{MIMO_META_XML}}"/>
+  <worldbody>
+    <light name="dusk_sun" pos="0 0 10" dir="0.8 -0.5 -0.15"
+           directional="true" diffuse="0.14 0.11 0.10"/>
+    <light name="dusk_fill" pos="10 0 6" dir="-0.3 0.4 -0.8"
+           directional="true" diffuse="0.045 0.060 0.11" castshadow="false"/>
+    <light name="streetlamp_left_2" pos="2 1.85 2.54" dir="0 0 -1"
+           diffuse="1 0.74 0.45" directional="false"/>
+    <light name="streetlamp_right_2" pos="2 -1.85 2.54" dir="0 0 -1"
+           diffuse="1 0.74 0.45" directional="false"/>
+    <light name="streetlamp_left_6" pos="6 1.85 2.54" dir="0 0 -1"
+           diffuse="1 0.74 0.45" directional="false"/>
+    <light name="streetlamp_right_6" pos="6 -1.85 2.54" dir="0 0 -1"
+           diffuse="1 0.74 0.45" directional="false"/>
+    <light name="streetlamp_left_10" pos="10 1.85 2.54" dir="0 0 -1"
+           diffuse="1 0.74 0.45" directional="false"/>
+    <light name="streetlamp_right_10" pos="10 -1.85 2.54" dir="0 0 -1"
+           diffuse="1 0.74 0.45" directional="false"/>
+    <light name="streetlamp_left_14" pos="14 1.85 2.54" dir="0 0 -1"
+           diffuse="1 0.74 0.45" directional="false"/>
+    <light name="streetlamp_right_14" pos="14 -1.85 2.54" dir="0 0 -1"
+           diffuse="1 0.74 0.45" directional="false"/>
+    <light name="streetlamp_left_18" pos="18 1.85 2.54" dir="0 0 -1"
+           diffuse="1 0.74 0.45" directional="false"/>
+    <light name="streetlamp_right_18" pos="18 -1.85 2.54" dir="0 0 -1"
+           diffuse="1 0.74 0.45" directional="false"/>
+
+    <geom name="floor" type="plane" pos="10 0 0" size="10 2 0.1" material="asphalt"/>
+    <geom name="street_verge" type="box" pos="10 0 -0.06" size="10 6 0.05"
+          material="verge" contype="0" conaffinity="0"/>
+    <geom name="sidewalk_left" type="box" pos="10 2.4 0.05" size="10 0.4 0.05" material="sidewalk"/>
+    <geom name="sidewalk_right" type="box" pos="10 -2.4 0.05" size="10 0.4 0.05" material="sidewalk"/>
+    <geom name="edge_line_left" type="box" pos="10 1.87 0.001" size="10 0.025 0.001"
+          material="edge_paint" contype="0" conaffinity="0"/>
+    <geom name="edge_line_right" type="box" pos="10 -1.87 0.001" size="10 0.025 0.001"
+          material="edge_paint" contype="0" conaffinity="0"/>
+    <geom name="center_dash_0" type="box" pos="1 0 0.001" size="0.4 0.035 0.001"
+          material="center_paint" contype="0" conaffinity="0"/>
+    <geom name="center_dash_1" type="box" pos="3 0 0.001" size="0.4 0.035 0.001"
+          material="center_paint" contype="0" conaffinity="0"/>
+    <geom name="center_dash_2" type="box" pos="5 0 0.001" size="0.4 0.035 0.001"
+          material="center_paint" contype="0" conaffinity="0"/>
+    <geom name="center_dash_3" type="box" pos="7 0 0.001" size="0.4 0.035 0.001"
+          material="center_paint" contype="0" conaffinity="0"/>
+    <geom name="center_dash_4" type="box" pos="9 0 0.001" size="0.4 0.035 0.001"
+          material="center_paint" contype="0" conaffinity="0"/>
+    <geom name="center_dash_5" type="box" pos="11 0 0.001" size="0.4 0.035 0.001"
+          material="center_paint" contype="0" conaffinity="0"/>
+    <geom name="center_dash_6" type="box" pos="13 0 0.001" size="0.4 0.035 0.001"
+          material="center_paint" contype="0" conaffinity="0"/>
+    <geom name="center_dash_7" type="box" pos="15 0 0.001" size="0.4 0.035 0.001"
+          material="center_paint" contype="0" conaffinity="0"/>
+    <geom name="center_dash_8" type="box" pos="17 0 0.001" size="0.4 0.035 0.001"
+          material="center_paint" contype="0" conaffinity="0"/>
+    <geom name="center_dash_9" type="box" pos="19 0 0.001" size="0.4 0.035 0.001"
+          material="center_paint" contype="0" conaffinity="0"/>
+
+    <body name="streetlight_left_2" pos="2 2.45 0">
+      <geom name="streetlight_left_2_base" type="cylinder" pos="0 0 0.12" size="0.09 0.06" material="lamp_metal"/>
+      <geom name="streetlight_left_2_pole" type="cylinder" pos="0 0 1.39" size="0.04 1.27" material="lamp_metal"/>
+      <geom name="streetlight_left_2_arm" type="box" pos="0 -0.3 2.66" size="0.04 0.34 0.035" material="lamp_metal"/>
+      <geom name="streetlight_left_2_head" type="box" pos="0 -0.6 2.66" size="0.18 0.14 0.06" material="lamp_metal"/>
+      <geom name="streetlight_left_2_panel" type="box" pos="0 -0.6 2.594" size="0.145 0.105 0.006"
+            material="lamp_panel" contype="0" conaffinity="0"/>
+    </body>
+    <body name="streetlight_right_2" pos="2 -2.45 0">
+      <geom name="streetlight_right_2_base" type="cylinder" pos="0 0 0.12" size="0.09 0.06" material="lamp_metal"/>
+      <geom name="streetlight_right_2_pole" type="cylinder" pos="0 0 1.39" size="0.04 1.27" material="lamp_metal"/>
+      <geom name="streetlight_right_2_arm" type="box" pos="0 0.3 2.66" size="0.04 0.34 0.035" material="lamp_metal"/>
+      <geom name="streetlight_right_2_head" type="box" pos="0 0.6 2.66" size="0.18 0.14 0.06" material="lamp_metal"/>
+      <geom name="streetlight_right_2_panel" type="box" pos="0 0.6 2.594" size="0.145 0.105 0.006"
+            material="lamp_panel" contype="0" conaffinity="0"/>
+    </body>
+    <body name="streetlight_left_6" pos="6 2.45 0">
+      <geom name="streetlight_left_6_base" type="cylinder" pos="0 0 0.12" size="0.09 0.06" material="lamp_metal"/>
+      <geom name="streetlight_left_6_pole" type="cylinder" pos="0 0 1.39" size="0.04 1.27" material="lamp_metal"/>
+      <geom name="streetlight_left_6_arm" type="box" pos="0 -0.3 2.66" size="0.04 0.34 0.035" material="lamp_metal"/>
+      <geom name="streetlight_left_6_head" type="box" pos="0 -0.6 2.66" size="0.18 0.14 0.06" material="lamp_metal"/>
+      <geom name="streetlight_left_6_panel" type="box" pos="0 -0.6 2.594" size="0.145 0.105 0.006"
+            material="lamp_panel" contype="0" conaffinity="0"/>
+    </body>
+    <body name="streetlight_right_6" pos="6 -2.45 0">
+      <geom name="streetlight_right_6_base" type="cylinder" pos="0 0 0.12" size="0.09 0.06" material="lamp_metal"/>
+      <geom name="streetlight_right_6_pole" type="cylinder" pos="0 0 1.39" size="0.04 1.27" material="lamp_metal"/>
+      <geom name="streetlight_right_6_arm" type="box" pos="0 0.3 2.66" size="0.04 0.34 0.035" material="lamp_metal"/>
+      <geom name="streetlight_right_6_head" type="box" pos="0 0.6 2.66" size="0.18 0.14 0.06" material="lamp_metal"/>
+      <geom name="streetlight_right_6_panel" type="box" pos="0 0.6 2.594" size="0.145 0.105 0.006"
+            material="lamp_panel" contype="0" conaffinity="0"/>
+    </body>
+    <body name="streetlight_left_10" pos="10 2.45 0">
+      <geom name="streetlight_left_10_base" type="cylinder" pos="0 0 0.12" size="0.09 0.06" material="lamp_metal"/>
+      <geom name="streetlight_left_10_pole" type="cylinder" pos="0 0 1.39" size="0.04 1.27" material="lamp_metal"/>
+      <geom name="streetlight_left_10_arm" type="box" pos="0 -0.3 2.66" size="0.04 0.34 0.035" material="lamp_metal"/>
+      <geom name="streetlight_left_10_head" type="box" pos="0 -0.6 2.66" size="0.18 0.14 0.06" material="lamp_metal"/>
+      <geom name="streetlight_left_10_panel" type="box" pos="0 -0.6 2.594" size="0.145 0.105 0.006"
+            material="lamp_panel" contype="0" conaffinity="0"/>
+    </body>
+    <body name="streetlight_right_10" pos="10 -2.45 0">
+      <geom name="streetlight_right_10_base" type="cylinder" pos="0 0 0.12" size="0.09 0.06" material="lamp_metal"/>
+      <geom name="streetlight_right_10_pole" type="cylinder" pos="0 0 1.39" size="0.04 1.27" material="lamp_metal"/>
+      <geom name="streetlight_right_10_arm" type="box" pos="0 0.3 2.66" size="0.04 0.34 0.035" material="lamp_metal"/>
+      <geom name="streetlight_right_10_head" type="box" pos="0 0.6 2.66" size="0.18 0.14 0.06" material="lamp_metal"/>
+      <geom name="streetlight_right_10_panel" type="box" pos="0 0.6 2.594" size="0.145 0.105 0.006"
+            material="lamp_panel" contype="0" conaffinity="0"/>
+    </body>
+    <body name="streetlight_left_14" pos="14 2.45 0">
+      <geom name="streetlight_left_14_base" type="cylinder" pos="0 0 0.12" size="0.09 0.06" material="lamp_metal"/>
+      <geom name="streetlight_left_14_pole" type="cylinder" pos="0 0 1.39" size="0.04 1.27" material="lamp_metal"/>
+      <geom name="streetlight_left_14_arm" type="box" pos="0 -0.3 2.66" size="0.04 0.34 0.035" material="lamp_metal"/>
+      <geom name="streetlight_left_14_head" type="box" pos="0 -0.6 2.66" size="0.18 0.14 0.06" material="lamp_metal"/>
+      <geom name="streetlight_left_14_panel" type="box" pos="0 -0.6 2.594" size="0.145 0.105 0.006"
+            material="lamp_panel" contype="0" conaffinity="0"/>
+    </body>
+    <body name="streetlight_right_14" pos="14 -2.45 0">
+      <geom name="streetlight_right_14_base" type="cylinder" pos="0 0 0.12" size="0.09 0.06" material="lamp_metal"/>
+      <geom name="streetlight_right_14_pole" type="cylinder" pos="0 0 1.39" size="0.04 1.27" material="lamp_metal"/>
+      <geom name="streetlight_right_14_arm" type="box" pos="0 0.3 2.66" size="0.04 0.34 0.035" material="lamp_metal"/>
+      <geom name="streetlight_right_14_head" type="box" pos="0 0.6 2.66" size="0.18 0.14 0.06" material="lamp_metal"/>
+      <geom name="streetlight_right_14_panel" type="box" pos="0 0.6 2.594" size="0.145 0.105 0.006"
+            material="lamp_panel" contype="0" conaffinity="0"/>
+    </body>
+    <body name="streetlight_left_18" pos="18 2.45 0">
+      <geom name="streetlight_left_18_base" type="cylinder" pos="0 0 0.12" size="0.09 0.06" material="lamp_metal"/>
+      <geom name="streetlight_left_18_pole" type="cylinder" pos="0 0 1.39" size="0.04 1.27" material="lamp_metal"/>
+      <geom name="streetlight_left_18_arm" type="box" pos="0 -0.3 2.66" size="0.04 0.34 0.035" material="lamp_metal"/>
+      <geom name="streetlight_left_18_head" type="box" pos="0 -0.6 2.66" size="0.18 0.14 0.06" material="lamp_metal"/>
+      <geom name="streetlight_left_18_panel" type="box" pos="0 -0.6 2.594" size="0.145 0.105 0.006"
+            material="lamp_panel" contype="0" conaffinity="0"/>
+    </body>
+    <body name="streetlight_right_18" pos="18 -2.45 0">
+      <geom name="streetlight_right_18_base" type="cylinder" pos="0 0 0.12" size="0.09 0.06" material="lamp_metal"/>
+      <geom name="streetlight_right_18_pole" type="cylinder" pos="0 0 1.39" size="0.04 1.27" material="lamp_metal"/>
+      <geom name="streetlight_right_18_arm" type="box" pos="0 0.3 2.66" size="0.04 0.34 0.035" material="lamp_metal"/>
+      <geom name="streetlight_right_18_head" type="box" pos="0 0.6 2.66" size="0.18 0.14 0.06" material="lamp_metal"/>
+      <geom name="streetlight_right_18_panel" type="box" pos="0 0.6 2.594" size="0.145 0.105 0.006"
+            material="lamp_panel" contype="0" conaffinity="0"/>
+    </body>
+
+    <body name="mimo_location" pos="1 0 0.4" euler="0 0 0">
+      <freejoint name="mimo_orientation"/>
+      <include file="{{MIMO_MODEL_XML}}"/>
+    </body>
+  </worldbody>
+  {{SCENE_EXTENSION_XML}}
+</mujoco>

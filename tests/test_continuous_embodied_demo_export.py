@@ -46,7 +46,7 @@ def test_fixed_export_clock_and_monitor_gain_are_predeclared() -> None:
     assert AUDIO_SAMPLES_PER_EAR == 2_006_400
     assert CONTACT_VIDEO_FRAME == 1_425
     assert MEDIA_MONITOR_GAIN == 0.04
-    assert 15.131268501281738 * MEDIA_MONITOR_GAIN < 1.0
+    assert 12.987203598022461 * MEDIA_MONITOR_GAIN < 1.0
 
 
 def test_full_export_preserves_public_sources_and_codec_contract(
@@ -128,6 +128,6 @@ def test_full_export_preserves_public_sources_and_codec_contract(
     assert pressure.dtype == np.float32
     assert np.all(np.isfinite(pressure))
     assert float(np.max(np.abs(pressure))) == pytest.approx(
-        15.131268501281738, abs=1e-12
+        12.987203598022461, abs=1e-12
     )
     assert not any(path.name.startswith("continuous-embodied-demo-") for path in output.iterdir())

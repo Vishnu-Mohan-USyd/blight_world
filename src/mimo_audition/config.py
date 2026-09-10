@@ -141,9 +141,10 @@ class AuditionSpec:
 class AuditionConfig:
     """Serializable configuration for the optional auditory sensor.
 
-    The bundled H10 HRTF is an adult surrogate rather than an infant-specific
-    anatomical model.  Pressure samples are in pascals and are never clipped
-    or automatically gain-controlled.
+    Both HRTF choices are reference anatomy, not an infant-specific model.
+    Native output uses the existing pressure convention; Steam Audio output
+    is a source-calibrated acoustic-pressure proxy. Neither is clipped or
+    automatically gain-controlled.
     """
 
     sample_rate_hz: int = 48_000
@@ -163,9 +164,33 @@ class AuditionConfig:
     enable_late_reverb: bool = True
     late_reverb_send: float = 0.12
     continuous: ContinuousSoundConfig | None = None
+    backend: str = "native"
+    steam_audio_library_path: str | None = None
+    steam_audio_ir_duration_s: float = 2.0
+    steam_audio_num_rays: int = 4_096
+    steam_audio_num_bounces: int = 16
+    steam_audio_num_threads: int = 2
 
     def __post_init__(self) -> None:
         AuditionSpec(self.sample_rate_hz)
+        if self.backend not in ("native", "steam_audio"):
+            raise ValueError("backend must be 'native' or 'steam_audio'")
+        if self.backend == "steam_audio" and self.sample_rate_hz != 48_000:
+            raise ValueError("Steam Audio requires 48000 Hz and 240-sample blocks")
+        if self.backend == "steam_audio" and self.hrtf_path is not None:
+            raise ValueError("Steam Audio uses its built-in reference-head HRTF")
+        if self.backend == "steam_audio":
+            if self.speed_of_sound_m_s not in (SPEED_OF_SOUND_M_S, 340.0):
+                raise ValueError("Steam Audio propagation uses the SDK's fixed 340 m/s")
+            object.__setattr__(self, "speed_of_sound_m_s", 340.0)
+        for name in (
+            "steam_audio_num_rays",
+            "steam_audio_num_bounces",
+            "steam_audio_num_threads",
+        ):
+            _positive_int(name, getattr(self, name))
+        if not isfinite(self.steam_audio_ir_duration_s) or self.steam_audio_ir_duration_s <= 0:
+            raise ValueError("steam_audio_ir_duration_s must be finite and positive")
         for name in (
             "max_registered_sources",
             "max_scheduled_events",
