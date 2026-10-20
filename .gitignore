@@ -4,6 +4,7 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 /.venv-unreal/
+/.venv-shapes/
 /third_party/
 /artifacts/
 /ue_project/**/Binaries/

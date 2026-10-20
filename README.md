@@ -10,11 +10,22 @@ Unreal street scene. Binocular RGB vision and minimal
 proprioception are present by default. The full biology profile enables MIMo's
 proprioception, touch and vestibular sensors; audition and Unreal rendering are
 optional. Scripted demonstration controllers are supplied separately from the
-neutral environment. No neural learning agent, training objective or curriculum
-has been implemented.
+neutral environment. The simulation does not yet integrate a neural learning
+agent, training objective or curriculum.
 
-The dependency is pinned to upstream MIMo commit
+The simulation dependency is pinned to upstream MIMo commit
 `040b0ae4914cbfb26afdf830aa81775b90922f3f` (version 2.0.0).
+
+## Shape classification and motion network
+
+The standalone [shape network experiment](networks/simple_shapes/README.md)
+contains the continuous stereo-video renderer, retinal preprocessing, joint
+classification/motion training code, recorded results and reproduction commands.
+The current 128-channel motion RNN achieved **94.67% object classification**,
+**8.00° mean direction error** and **1.03 cm/s mean speed error** on its six-shape
+TEST dataset. It estimates object velocity in room coordinates and trains both
+pathways together from scratch. See the guide for dependencies and dataset
+generation; its training environment is separate from the simulation stack.
 
 ## Installed Unreal workspace
 

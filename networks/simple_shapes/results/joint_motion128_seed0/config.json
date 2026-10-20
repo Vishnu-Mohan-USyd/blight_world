@@ -1,0 +1,32 @@
+{
+  "cache": "/mnt/data_drive/vishnu/bl3_nets_expanded_20261010/simple_shapes_camera_sweep_2s_coarsegrid_128_20261019/cache",
+  "branch_after": 3,
+  "seed": 0,
+  "motion_channels": 128,
+  "motion_scale_cm_s": 6.8926159357457255,
+  "device": "cuda:0",
+  "epochs": 128,
+  "frames": 48,
+  "classes": [
+    "box",
+    "sphere",
+    "cylinder",
+    "cone",
+    "pyramid",
+    "torus"
+  ],
+  "physical_batch": 32,
+  "effective_batch": 65,
+  "parameters": 966152,
+  "motion_parameters": 308354,
+  "initialization": "From scratch, same object weights across branches; original identity/projected object recurrence; independently seeded motion adapter/input/recurrent/readout",
+  "motion_architecture": "1x1 adapter to128; Conv3x3 input + Conv3x3 recurrent; tanh; pool4x5; Linear2560->2; native tap resolution",
+  "motion_reference": "Actual object interval velocity in fixed room X/Y axes (Y up), cm/s",
+  "motion_targets": "Actual displacement across consecutive cache samples / dt; first frame excluded",
+  "objective": "Mean object CE across48 carried prefixes + mean squared motion component error across47 intervals, velocity unit6.8926159357457255cm/s, weight1",
+  "selection": "Lowest VAL final-object CE + motion component MSE; higher object accuracy breaks ties; TEST unused",
+  "optimizer": "AdamW lr0.001; decay0.01 except object RNN0.0001; cosine128; clip5.783946721808504; original object recurrent projection",
+  "augmentation": false,
+  "sequence": "All48 chronological frames, zero initial states, full BPTT, both losses train shared layers",
+  "precision": "BF16 CNN/motion recurrence, FP32 object RNN/readouts/losses/master weights"
+}
