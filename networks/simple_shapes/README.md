@@ -1,34 +1,37 @@
 # Current shape classification and motion network
 
-Updated 20 October 2026, Australia/Sydney.
+Updated 22 October 2026, Australia/Sydney.
 
 The current network learns object category and object velocity together from scratch. Each input is one continuous 48-frame stereo recording of a moving shape while the camera sweeps through 60 degrees. The images are 128 × 128 pixels per eye with a coarse wall grid. The object pathway has a 128-unit vector RNN; the motion pathway branches after the third convolution and has a 128-channel spatial RNN.
 
-The selected model classifies **284/300 TEST videos correctly, or 94.67%**, with **8.00° mean direction error** and **1.03 cm/s mean speed error** relative to the room. These results come from the seed-0 run selected at epoch 94 of 128.
+The current dataset has **12 classes and 7,200 generated objects**, with one recording per object. The selected model classifies **1,071/1,200 TEST videos correctly, or 89.25%**, with **7.03° mean direction error** and **0.96 cm/s mean speed error** relative to the room. These results come from the seed-0 run selected at epoch 71 of 128.
+
+The expansion doubles the shape families from six to twelve and the examples per class from 200/50/50 to 400/100/100 for TRAIN/VAL/TEST. Recording settings and training settings remain unchanged. The classification output increases from six to twelve logits; both pathways are trained together from scratch.
 
 ## Recorded results
 
-All three runs below use the same 128-pixel coarse-grid dataset. Each was trained from scratch with seed 0.
+The current run uses twelve classes; the three historical runs use the earlier six-class dataset. All use 128-pixel images, the coarse wall grid and seed 0, with training from scratch.
 
 | Recorded run | Selected epoch | TEST classification | Direction MAE | Speed MAE | Velocity vector MAE |
 |---|---:|---:|---:|---:|---:|
-| [Classification only](results/classification_only_seed0/test_report.json) | 87 | 281/300, 93.67% | — | — | — |
-| [Joint motion 64](results/joint_motion64_seed0/test_report.json) | 93 | 281/300, 93.67% | 8.6870° | 1.1320 cm/s | 1.7229 cm/s |
-| [Joint motion 128](results/joint_motion128_seed0/test_report.json) | 94 | 284/300, 94.67% | 7.9971° | 1.0290 cm/s | 1.5791 cm/s |
+| [Current: 12 classes, joint motion 128](results/joint_motion128_12classes_seed0/test_report.json) | 71 | 1,071/1,200, 89.25% | 7.0306° | 0.9633 cm/s | 1.4434 cm/s |
+| [Historical: 6 classes, classification only](results/classification_only_seed0/test_report.json) | 87 | 281/300, 93.67% | — | — | — |
+| [Historical: 6 classes, joint motion 64](results/joint_motion64_seed0/test_report.json) | 93 | 281/300, 93.67% | 8.6870° | 1.1320 cm/s | 1.7229 cm/s |
+| [Historical: 6 classes, joint motion 128](results/joint_motion128_seed0/test_report.json) | 94 | 284/300, 94.67% | 7.9971° | 1.0290 cm/s | 1.5791 cm/s |
 
-The 64-to-128 comparison changes only the motion recurrent width. It improved classification by three videos, direction error by 0.69°, and speed error by 0.103 cm/s in this run. The classification-only baseline uses a different checkpoint criterion, described below. These are individual seed-0 results.
+Within the historical six-class dataset, the 64-to-128 comparison changes only the motion recurrent width. It improved classification by three videos, direction error by 0.69°, and speed error by 0.103 cm/s in this run. The classification-only baseline uses a different checkpoint criterion, described below. These are individual seed-0 results.
 
 At the selected current checkpoint:
 
 | Split | Classification | Direction MAE | Speed MAE |
 |---|---:|---:|---:|
-| TRAIN | 1,200/1,200, 100% | 6.0516° | 0.8262 cm/s |
-| VAL | 284/300, 94.67% | 8.4957° | 1.0266 cm/s |
-| TEST | 284/300, 94.67% | 7.9971° | 1.0290 cm/s |
+| TRAIN | 4,640/4,800, 96.67% | 6.5383° | 0.9148 cm/s |
+| VAL | 1,086/1,200, 90.50% | 7.0736° | 0.9420 cm/s |
+| TEST | 1,071/1,200, 89.25% | 7.0306° | 0.9633 cm/s |
 
-Each VAL/TEST motion result averages 14,100 intervals: 300 recordings × 47 intervals. The average actual TEST interval speed is 9.03 cm/s, including transitions; the current speed MAE is about 11.4% of that mean. The recorded current training duration was 1,459.9 seconds, about 24.3 minutes.
+Each current VAL/TEST motion result averages 56,400 intervals: 1,200 recordings × 47 intervals. The recorded training duration was 6,023.8 seconds, about 100.4 minutes. The scores above all use the selected epoch-71 checkpoint; later epochs in the training history are not the evaluated TEST model.
 
-The [training report](results/joint_motion128_seed0/report.json) contains selected-checkpoint TRAIN/VAL results and final-epoch VAL results. The [TEST report](results/joint_motion128_seed0/test_report.json) contains the separate TEST evaluation. Reported model scores use `best.pt`, selected by validation, rather than `last.pt`.
+The [training report](results/joint_motion128_12classes_seed0/report.json) contains selected-checkpoint TRAIN/VAL results and final-epoch VAL results. The [TEST report](results/joint_motion128_12classes_seed0/test_report.json) contains the separate TEST evaluation. Reported model scores use `best.pt`, selected by validation, rather than `last.pt`.
 
 This repository includes the code, configuration and result reports. Recordings, retinal caches, checkpoints, training histories and preview files are not included. Generate the dataset and train with the commands below, or point the commands at an existing compatible dataset cache. Absolute paths in the archived JSON reports record the original experiment locations; the runnable commands use your own storage paths.
 
@@ -48,9 +51,10 @@ networks/simple_shapes/
     prepare_retina.py          current 128-pixel retinal preprocessing
     gpu_filters.py             parvo and magno filter implementation
   results/
-    classification_only_seed0/ recorded config, training report and TEST report
-    joint_motion64_seed0/      recorded config, training report and TEST report
-    joint_motion128_seed0/     recorded config, training report and TEST report
+    joint_motion128_12classes_seed0/ current config, training and TEST reports
+    classification_only_seed0/       historical six-class reports
+    joint_motion64_seed0/            historical six-class reports
+    joint_motion128_seed0/           historical six-class reports
 ```
 
 | Code | Responsibility |
@@ -79,10 +83,10 @@ Checkpoints store model weights, not optimizer/scheduler state. The training scr
 
 | Property | Current value |
 |---|---|
-| Classes in label order | 0 box, 1 sphere, 2 cylinder, 3 cone, 4 pyramid, 5 torus |
-| TRAIN | 1,200 videos; 200 per class; generation seed 19701 |
-| VAL | 300 videos; 50 per class; generation seed 19702 |
-| TEST | 300 videos; 50 per class; generation seed 19703 |
+| Classes in label order | 0 box, 1 sphere, 2 cylinder, 3 cone, 4 pyramid, 5 torus, 6 capsule, 7 ellipsoid, 8 triangular_prism, 9 hexagonal_prism, 10 tetrahedron, 11 truncated_cone |
+| TRAIN | 4,800 videos; 400 per class; generation seed 19701 |
+| VAL | 1,200 videos; 100 per class; generation seed 19702 |
+| TEST | 1,200 videos; 100 per class; generation seed 19703 |
 | Recording | 48 consecutive frames at 12 fps; four-second playback |
 | Stereo images | 128 × 128 per eye; 4.9 cm eye separation; parallel stereo axes |
 | Camera | Constant-speed 60° horizontal arc, radius 1.05 m, fixed look-at point (0, 0, 0.20 m), vertical field of view 60° |
@@ -97,11 +101,11 @@ Checkpoints store model weights, not optimizer/scheduler state. The training scr
 
 The four-second recording has two motion periods, with the transition from the first velocity to the second over 1.75–2.0 seconds. Nominal speeds are approximately 5.68, 11.37 and 17.05 cm/s. Speed selection and whole-path rejection mean that accepted recordings need not contain equally many examples of each speed. Smooth transitions can also have intermediate speeds.
 
-Object orientation stays fixed within a recording while the camera changes viewpoint. New orientations, mesh proportions, trajectories and camera directions are generated across recordings and splits. Evaluation therefore measures category recognition on new generated examples of these six shape families. The present task has planar object motion and a 60° camera arc.
+Object orientation stays fixed within a recording while the camera changes viewpoint. New orientations, mesh proportions, trajectories and camera directions are generated across recordings and splits. Evaluation therefore measures category recognition on new generated examples of these twelve shape families. The present task has planar object motion and a 60° camera arc.
 
 Frames are rendered with twofold spatial supersampling and downsampled to 128 pixels. World-space trajectories retain the original 64-pixel motion reference, so increasing image resolution did not change physical speeds. The metadata field `reference_speeds_pixels_per_frame` refers to that original fixed-camera reference.
 
-Generated `data/index.json` records labels, generation seeds, mesh parameters, orientations, all 48 world positions and camera angles. Raw arrays have shape `[videos, 48, 2, 3, 128, 128]`, dtype `uint8`. Generation also creates `data/sample_shapes.png` and `sample_box.mp4`, `sample_sphere.mp4`, `sample_cylinder.mp4`, `sample_cone.mp4`, `sample_pyramid.mp4`, `sample_torus.mp4` in `data/`, showing one training example per class. Full recordings are stored in the RGB arrays.
+Generated `data/index.json` records labels, generation seeds, mesh parameters, orientations, all 48 world positions and camera angles. Raw arrays have shape `[videos, 48, 2, 3, 128, 128]`, dtype `uint8`. Generation also creates `data/sample_shapes.png` and twelve `sample_<class>.mp4` videos in `data/`, showing one training example per class. Full recordings are stored in the RGB arrays.
 
 ## Retinal inputs
 
@@ -117,7 +121,7 @@ Each cached split is `[videos × 48, 12, 128, 128]`, dtype `float16`. Training r
 Stereo retinal frame: 12 × 128 × 128
   Conv1 → Conv2 → Conv3: shared features, 64 × 32 × 32
     Object: Conv4 → Conv5 → Conv6 → pool → linear128
-            → ReLU RNN128 → six class logits
+            → ReLU RNN128 → twelve class logits
     Motion: adapter128 → input convolution
             → spatial tanh RNN128 → pool → two velocity components
 ```
@@ -133,7 +137,7 @@ Every numbered convolution has GroupNorm with eight groups and ReLU after it; th
 | Conv5, object | 64 → 128 | 3 / 2 / 1 | 128 × 16 × 16 |
 | Conv6, object | 128 → 128 | 3 / 1 / 1 | 128 × 16 × 16 |
 
-The object branch applies adaptive average pooling to 4 × 5, flattens to 2,560 values, then applies Linear(2560, 128) and ReLU. A one-layer, ungated `nn.RNN(128, 128, nonlinearity='relu')` carries object state across frames. Linear(128, 6) gives class logits. The last frame's logits determine the video classification.
+The object branch applies adaptive average pooling to 4 × 5, flattens to 2,560 values, then applies Linear(2560, 128) and ReLU. A one-layer, ungated `nn.RNN(128, 128, nonlinearity='relu')` carries object state across frames. Linear(128, 12) gives class logits. The last frame's logits determine the video classification.
 
 The motion branch taps Conv3 after its normalization and ReLU. A bias-free 1 × 1 adapter maps 64 to 128 channels. A 3 × 3 input convolution with bias supplies the current drive; a bias-free 3 × 3 recurrent convolution supplies the previous-state drive. Both use padding 1. The update is:
 
@@ -144,7 +148,13 @@ motion_state[t] = tanh(input_conv(adapter(features[t]))
 
 The state is `[batch, 128, 32, 32]`: **128 spatial channels**, compared with the object RNN's 128-element vector. Adaptive average pooling to 4 × 5 and Linear(2560, 2) produce normalized velocity components at every frame. Both recurrent states start at zero for each video and carry through all 48 frames.
 
-The current model has 966,152 trainable parameters: 657,798 in the inherited object model and 308,354 added by the motion branch. Both objectives update the shared first three convolution blocks. Motion-64 uses the same equations with 64 channels and has 738,248 total parameters.
+The current model has 966,926 trainable parameters: 658,572 in the object model and 308,354 added by the motion branch. Both objectives update the shared first three convolution blocks. The historical six-class motion-128 model has 966,152 parameters; its motion-64 counterpart has 738,248.
+
+### Motion recurrence rationale
+
+The motivation is to retain spatial memory across frames. Each location in the motion state receives the current local features and a learned combination of neighbouring locations in the previous state. The same recurrent convolution is applied across the grid. This gives the network a structure for learning movement of object edges and background features before pooling them into a velocity estimate.
+
+A regular vector RNN could also learn motion. **A regular RNN has not been tested as the motion branch**, so the experiments do not establish that the ConvRNN is better. The existing regular 128-unit RNN serves classification. Earlier motion experiments varied convolutional recurrent width and branching point; they did not compare convolutional and vector recurrence.
 
 ## Motion reference and objectives
 
@@ -159,7 +169,7 @@ scale = 6.8926159357457255 cm/s
 predicted_velocity_cm_s = model_velocity_output * scale
 ```
 
-The scale is the training-set RMS across velocity components. Recorded positions construct supervision labels; the network receives the retinal images as its input. Frame 0 has no preceding interval, so its motion output is excluded from loss and metrics.
+The scale is the original six-class training-set RMS across velocity components, retained unchanged for the twelve-class run. Recorded positions construct supervision labels; the network receives the retinal images as its input. Frame 0 has no preceding interval, so its motion output is excluded from loss and metrics.
 
 The training objective is:
 
@@ -192,7 +202,7 @@ Classification accuracy counts videos whose final-state class is correct. Speed 
 | Augmentation | Disabled |
 | Checkpoint selection | Lowest VAL final-state object CE + normalized motion component MSE; higher VAL classification accuracy breaks ties |
 
-The selected current checkpoint is epoch 94. Training completed all 128 epochs; TEST was evaluated separately using the selected checkpoint. The classification-only baseline instead selects by highest VAL final-state accuracy, breaking ties with lower CE, and uses physical batch 65. Its other recorded object training settings match the values above.
+The selected current checkpoint is epoch 71. Training completed all 128 epochs; TEST was evaluated separately using the selected checkpoint. The historical six-class classification-only baseline instead selects by highest VAL final-state accuracy, breaking ties with lower CE, and uses physical batch 65. Its other recorded object training settings match the values above.
 
 The recurrent layers are rate-based engineering approximations. Their implemented learning rule is supervised backpropagation through time with AdamW; the object recurrent projection is part of the current training procedure.
 
@@ -213,8 +223,8 @@ python -m pip install -r networks/simple_shapes/requirements.txt
 
 export SHAPES_PYTHON=python
 export SHAPES_CODE="$PWD/networks/simple_shapes/code"
-export SHAPES_STORAGE="$PWD/artifacts/simple_shapes_128_coarsegrid"
-export SHAPES_RUN="$SHAPES_STORAGE/joint_motion128_seed0"
+export SHAPES_STORAGE="$PWD/artifacts/simple_shapes_12classes_128"
+export SHAPES_RUN="$SHAPES_STORAGE/joint_motion128_12classes_seed0"
 ```
 
 The remaining commands use these variables in the same shell. With an existing cache, use its parent directory for `SHAPES_STORAGE` in the setup block and skip generation. A compatible cache contains `index.json` and `train.npy`, `val.npy`, `test.npy` in the format described above, including each recording's `positions_m` for motion targets.
@@ -261,43 +271,9 @@ Continue in the same shell after training:
 
 Evaluation loads `best.pt` and its saved motion scale. Match the branch and motion width to the checkpoint. Training refuses to overwrite a nonempty output directory; TEST evaluation refuses to overwrite an existing `test_report.json`. Once a run has been evaluated, read that report for its scores.
 
-### Train and evaluate the 64-channel comparison
+### Historical six-class setup
 
-Only the motion width and output directory change:
-
-```bash
-SHAPES_RUN64="$SHAPES_STORAGE/joint_motion64_seed0"
-
-"$SHAPES_PYTHON" "$SHAPES_CODE/train_joint_motion.py" \
-  --cache "$SHAPES_STORAGE/cache" --output "$SHAPES_RUN64" \
-  --branch-after 3 --motion-channels 64 \
-  --motion-scale-cm-s 6.8926159357457255 \
-  --device cuda:0 --seed 0 --epochs 128 --physical-batch 32
-
-"$SHAPES_PYTHON" "$SHAPES_CODE/train_joint_motion.py" \
-  --cache "$SHAPES_STORAGE/cache" --output "$SHAPES_RUN64" \
-  --branch-after 3 --motion-channels 64 \
-  --device cuda:0 --physical-batch 32 --evaluate-test
-```
-
-### Train the classification-only baseline
-
-Using the shell variables above:
-
-```bash
-SHAPES_CLASS_RUN="$SHAPES_STORAGE/classification_only_seed0"
-
-"$SHAPES_PYTHON" "$SHAPES_CODE/train_expanded_rnn.py" \
-  --cache "$SHAPES_STORAGE/cache" \
-  --output "$SHAPES_CLASS_RUN" \
-  --device cuda:0 --seed 0 --epochs 128 --train-frames 48 \
-  --videos-per-update 65 --physical-batch 65 --encoder-head-weight-decay 0.01
-
-"$SHAPES_PYTHON" "$SHAPES_CODE/train_expanded_rnn.py" \
-  --cache "$SHAPES_STORAGE/cache" \
-  --output "$SHAPES_CLASS_RUN" \
-  --device cuda:0 --physical-batch 65 --evaluate-test
-```
+The current renderer generates twelve classes and 7,200 recordings. The six-class generator, baseline commands and guide are preserved on [branch `codex/simple-shapes-motion128-20261020`](https://github.com/Vishnu-Mohan-USyd/blight_world/tree/codex/simple-shapes-motion128-20261020/networks/simple_shapes). Use that version and a separate storage directory to reproduce the historical six-class experiments.
 
 ### Load your trained joint model
 

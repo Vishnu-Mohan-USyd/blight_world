@@ -21,9 +21,10 @@ The simulation dependency is pinned to upstream MIMo commit
 The standalone [shape network experiment](networks/simple_shapes/README.md)
 contains the continuous stereo-video renderer, retinal preprocessing, joint
 classification/motion training code, recorded results and reproduction commands.
-The current 128-channel motion RNN achieved **94.67% object classification**,
-**8.00° mean direction error** and **1.03 cm/s mean speed error** on its six-shape
-TEST dataset. It estimates object velocity in room coordinates and trains both
+The current 12-class experiment uses 7,200 recordings and achieved **89.25% object
+classification**, **7.03° mean direction error** and **0.96 cm/s mean speed error**
+on 1,200 TEST videos. Classification uses a 128-unit RNN; motion uses a 128-channel
+ConvRNN. It estimates object velocity in room coordinates and trains both
 pathways together from scratch. See the guide for dependencies and dataset
 generation; its training environment is separate from the simulation stack.
 

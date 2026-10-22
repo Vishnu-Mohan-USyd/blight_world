@@ -21,8 +21,10 @@ EYES = (-0.0245, 0.0245)
 LIGHT = np.array([-0.4, 0.65, 1.0])
 LIGHT /= np.linalg.norm(LIGHT)
 ORANGE = np.array([230., 119., 39.])
-CLASSES = ["box", "sphere", "cylinder", "cone", "pyramid", "torus"]
-SPLITS = {"train": (1200, 19701), "val": (300, 19702), "test": (300, 19703)}
+CLASSES = ["box", "sphere", "cylinder", "cone", "pyramid", "torus",
+           "capsule", "ellipsoid", "triangular_prism", "hexagonal_prism",
+           "tetrahedron", "truncated_cone"]
+SPLITS = {"train": (4800, 19701), "val": (1200, 19702), "test": (1200, 19703)}
 DEFAULT_OUT = Path("artifacts/simple_shapes/data")
 
 
@@ -76,6 +78,34 @@ def make_shape(name, rng):
         else:
             mesh = trimesh.creation.cone(**parameters,
                                         sections=4 if name == "pyramid" else 32)
+    elif name == "capsule":
+        parameters.update(radius=float(rng.uniform(.30, .35)),
+                          height=float(rng.uniform(.8, 1.0)), count=[16, 32])
+        mesh = trimesh.creation.capsule(**parameters)
+    elif name == "ellipsoid":
+        parameters["axis_scales"] = [float(rng.uniform(.65, .80)),
+                                     float(rng.uniform(.95, 1.05)),
+                                     float(rng.uniform(1.50, 1.70))]
+        mesh = trimesh.creation.icosphere(subdivisions=2)
+        mesh.vertices *= parameters["axis_scales"]
+    elif name in ("triangular_prism", "hexagonal_prism"):
+        parameters.update(radius=float(rng.uniform(.45, .55)),
+                          height=float(rng.uniform(.9, 1.1)),
+                          sections=3 if name == "triangular_prism" else 6)
+        mesh = trimesh.creation.cylinder(**parameters)
+    elif name == "tetrahedron":
+        parameters["radius"] = float(rng.uniform(.45, .55))
+        parameters.update(height=parameters["radius"] * float(rng.uniform(1.25, 1.55)),
+                          sections=3)
+        mesh = trimesh.creation.cone(**parameters)
+    elif name == "truncated_cone":
+        parameters.update(radius=float(rng.uniform(.45, .55)),
+                          height=float(rng.uniform(.9, 1.1)),
+                          top_radius_ratio=float(rng.uniform(.45, .65)), sections=32)
+        radius, height = parameters["radius"], parameters["height"]
+        profile = [[0., -height / 2], [radius, -height / 2],
+                   [radius * parameters["top_radius_ratio"], height / 2], [0., height / 2]]
+        mesh = trimesh.creation.revolve(profile, sections=parameters["sections"])
     else:
         parameters.update(major_radius=float(rng.uniform(.60, .70)),
                           minor_radius=float(rng.uniform(.21, .26)))
@@ -195,7 +225,7 @@ def render_recording(job):
     faces = np.asarray(mesh.faces)
     vertex_normals = np.asarray(mesh.vertex_normals)
     face_normals = np.asarray(mesh.face_normals)
-    smooth = CLASSES[label] in ("sphere", "torus")
+    smooth = CLASSES[label] in ("sphere", "torus", "capsule", "ellipsoid")
     camera_direction = int(np.random.default_rng(np.random.SeedSequence([seed, 1903])).choice([-1, 1]))
     camera_order = np.arange(FRAMES) if camera_direction == 1 else np.arange(FRAMES)[::-1]
     recording = np.empty((FRAMES, 2, 3, SIZE, SIZE), dtype=np.uint8)
@@ -219,7 +249,8 @@ def save_inspection(out, index):
     data = np.load(out / "train.npy", mmap_mode="r")
     examples = [next(r for r in index["splits"]["train"] if r["label"] == c)
                 for c in range(len(CLASSES))]
-    sheet = Image.new("RGB", (3 * 256, 2 * 282), "#20262d")
+    rows = (len(CLASSES) + 2) // 3
+    sheet = Image.new("RGB", (3 * 256, rows * 282), "#20262d")
     draw = ImageDraw.Draw(sheet)
     for c, record in enumerate(examples):
         frames = data[record["array_index"]]

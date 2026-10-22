@@ -1,0 +1,20 @@
+{
+  "epoch": 71,
+  "branch_after": 3,
+  "motion_channels": 128,
+  "motion_scale_cm_s": 6.8926159357457255,
+  "test": {
+    "correct": 1071,
+    "count": 1200,
+    "accuracy": 0.8925,
+    "object_ce": 0.2967572769025962,
+    "motion_component_mse": 0.03074397651826866,
+    "velocity_component_mse_cm2_s2": 1.4605895844588044,
+    "velocity_vector_mae_cm_s": 1.4434258881697417,
+    "speed_mae_cm_s": 0.9633362833658854,
+    "direction_mae_deg": 7.0305697047456785,
+    "motion_intervals": 56400,
+    "direction_intervals": 56400,
+    "selection_loss": 0.32750125342086484
+  }
+}
